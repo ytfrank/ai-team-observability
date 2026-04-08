@@ -1,0 +1,113 @@
+{
+    "project": "ai-team-observability",
+    "version": "V1.0",
+    "lifecycle": "active",
+    "created_at": "2026-04-08T19:16:00+08:00",
+    "workflow": {
+        "current_stage": "developing",
+        "stage_history": [
+            {
+                "stage": "draft",
+                "entered_at": "2026-04-08T19:16:00+08:00",
+                "exited_at": "2026-04-08T19:16:00+08:00"
+            },
+            {
+                "stage": "requirements_ready",
+                "entered_at": "2026-04-08T19:16:00+08:00",
+                "exited_at": "2026-04-08T19:16:00+08:00"
+            },
+            {
+                "stage": "planned",
+                "entered_at": "2026-04-08T19:16:00+08:00",
+                "exited_at": "2026-04-08T19:23:00+08:00"
+            },
+            {
+                "stage": "developing",
+                "entered_at": "2026-04-08T19:23:00+08:00",
+                "note": "Peter技术方案确认，启动Phase 1并行开发"
+            }
+        ],
+        "stage_owner": "peter",
+        "stage_status": "in_progress"
+    },
+    "official": {
+        "updated_at": "2026-04-08T19:23:00+08:00",
+        "updated_by": "doraemon",
+        "summary": "技术方案确认，基于mudrii/openclaw-dashboard+自研事件层，3个sub-agent并行开发，预计3.5h",
+        "blocking": null,
+        "risks": [
+            "mudrii Go代码二次开发友好度待源码验证",
+            "Collector状态识别逻辑需明确规则避免假数据"
+        ],
+        "decisions": [
+            "ClawMetry不存在，排除",
+            "Opik过重，排除",
+            "采用mudrii/openclaw-dashboard为基座+自研事件层",
+            "3个sub-agent并行开发，预计3.5h"
+        ]
+    },
+    "runtime": {
+        "last_runtime_update_at": "2026-04-08T19:23:00+08:00",
+        "last_runtime_update_by": "doraemon",
+        "active_role": "peter",
+        "active_tasks": [
+            "Phase 1: Collector+Schema+API",
+            "Phase 1: 3个前端页面",
+            "Phase 1: 测试用例"
+        ],
+        "waiting_on": null,
+        "recent_actions": [
+            "2026-04-08T19:23 小叮当确认技术方案，阶段进入developing",
+            "2026-04-08T19:23 Peter启动Phase 1并行开发"
+        ]
+    },
+    "roles": {
+        "product_owner": "doraemon",
+        "tech_owner": "atlas",
+        "data_integration": "peter",
+        "qa_rules": "guard"
+    },
+    "artifacts": {
+        "requirements": {
+            "path": "requirements/REQUIREMENTS.md",
+            "status": "done",
+            "owner": "doraemon"
+        },
+        "tech_plan": {
+            "path": "dev/TECH_PLAN.md",
+            "status": "done",
+            "owner": "peter"
+        },
+        "submission": {
+            "path": "dev/SUBMISSION.md",
+            "status": "not_started",
+            "owner": "peter"
+        },
+        "qa_report": {
+            "path": "qa/report.md",
+            "status": "not_started",
+            "owner": "guard"
+        }
+    },
+    "deploy": {
+        "domain": "monitor.doramax.cn",
+        "method": "cloudflare-tunnel"
+    },
+    "history": [
+        {
+            "time": "2026-04-08T19:16:00+08:00",
+            "actor": "doraemon",
+            "action": "项目立项，创建需求文档"
+        },
+        {
+            "time": "2026-04-08T19:23:00+08:00",
+            "actor": "peter",
+            "action": "输出技术方案：mudrii+自研事件层，3.5h预估"
+        },
+        {
+            "time": "2026-04-08T19:23:00+08:00",
+            "actor": "doraemon",
+            "action": "确认技术方案，阶段进入developing"
+        }
+    ]
+}
