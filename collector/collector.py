@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""
+AI Team Observability - Event Collector
+
+Scans OpenClaw session files, agent logs, status.json etc.
+Writes events to SQLite for the monitoring dashboard.
+
+Usage: python3 collector.py [--db PATH] [--once]
+  --db    Path to SQLite database (default: data/events.db)
+  --once  Run once instead of continuous loop
+"""
+
+import json
+import os
+import sys
+import time
+import glob
+import sqlite3
+import hashlib
+import argparse
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+# ── Config ──────────────────────────────────────────────
+
+OPENCLAW_HOME = Path(os.environ.get('OPENCLAW_HOME', os.path.expanduser('~/.openclaw')))
+PROJECTS_HOME = Path(os.environ.get('PROJECTS_HOME', os.path.expanduser('~/projects')))
+AGENTS_DIR = OPENCLAW_HOME / 'agents'
+
+CST = timezone(timedelta(hours=8))
+
+# ── SQLite Schema ───────────────────────────────────────
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS event_log (
+    event_id      TEXT PRIMARY KEY,
+    event_time    TEXT NOT NULL,
+    source_type   TEXT NOT NULL,
+    agent_name    TEXT NOT NULL,
+    project_id    TEXT,
+    event_category TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    severity      TEXT DEFAULT 'info',
+    provider      TEXT,
+    model         TEXT,
+    input_tokens  INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    summary       TEXT,
+    payload_json  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_time ON event_log(event_time);
+CREATE INDEX IF NOT EXISTS idx_agent ON event_log(agent_name, event_time);
+CREATE INDEX IF NOT EXISTS idx_project ON event_log(project_id, event_time);
+
+CREATE TABLE IF NOT EXISTS agg_agent_status (
+    agent_name       TEXT PRIMARY KEY,
+    status           TEXT NOT NULL DEFAULT 'idle',
+    current_project  TEXT,
+    current_task     TEXT,
+    current_stage    TEXT,
+    current_model    TEXT,
+    task_start_time  TEXT,
+    last_action_time TEXT,
+    last_a2a_time    TEXT,
+    last_5_actions   TEXT,
+    updated_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agg_project_flow (
+    project_id       TEXT PRIMARY KEY,
+    current_stage    TEXT NOT NULL,
+    stage_owner      TEXT,
+    stage_enter_time TEXT,
+    total_elapsed_min INTEGER DEFAULT 0,
+    is_overtime      INTEGER DEFAULT 0,
+    latest_artifact  TEXT,
+    block_reason     TEXT,
+    stage_history    TEXT,
+    updated_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agg_model_usage (
+    provider       TEXT,
+    model          TEXT,
+    period_start   TEXT,
+    period_type    TEXT,
+    request_count  INTEGER DEFAULT 0,
+    input_tokens   INTEGER DEFAULT 0,
+    output_tokens  INTEGER DEFAULT 0,
+    by_agent       TEXT,
+    PRIMARY KEY (provider, model, period_start, period_type)
+);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    alert_id     TEXT PRIMARY KEY,
+    alert_time   TEXT NOT NULL,
+    alert_type   TEXT NOT NULL,
+    severity     TEXT NOT NULL,
+    agent_name   TEXT,
+    project_id   TEXT,
+    message      TEXT,
+    notified     TEXT,
+    acknowledged INTEGER DEFAULT 0,
+    resolved_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS collector_state (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
+"""
+
+def init_db(db_path):
+    """Initialize SQLite database with schema."""
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(SCHEMA_SQL)
+    conn.commit()
+    return conn
+
+def event_id(*parts):
+    """Generate deterministic event ID."""
+    raw = '|'.join(str(p) for p in parts)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+def now_cst():
+    return datetime.now(CST).isoformat(timespec='seconds')
+
+# ── Data Source 1: Session Files ────────────────────────
+
+def scan_sessions(conn, last_run):
+    """Scan OpenClaw session JSONL files for agent activity."""
+    events = []
+    sessions_dir = OPENCLAW_HOME / 'sessions'
+    if not sessions_dir.exists():
+        return events
+
+    for agent_dir in AGENTS_DIR.iterdir():
+        if not agent_dir.is_dir():
+            continue
+        agent_name = agent_dir.name
+        agent_sessions = agent_dir / 'sessions'
+        if not agent_sessions.exists():
+            continue
+
+        for session_file in sorted(agent_sessions.glob('*.jsonl')):
+            mtime = os.path.getmtime(session_file)
+            if mtime < last_run:
+                continue
+
+            try:
+                with open(session_file) as f:
+                    for line_no, line in enumerate(f, 1):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+
+                        # Extract relevant events
+                        ts = entry.get('ts', entry.get('timestamp', ''))
+                        role = entry.get('role', '')
+                        model = entry.get('model', '')
+                        usage = entry.get('usage', {})
+                        content = entry.get('content', '')
+
+                        if not ts:
+                            continue
+
+                        eid = event_id(str(session_file), line_no)
+                        inp = usage.get('prompt_tokens', 0) or 0
+                        out = usage.get('completion_tokens', 0) or 0
+
+                        events.append({
+                            'event_id': eid,
+                            'event_time': ts if isinstance(ts, str) else str(ts),
+                            'source_type': 'session_file',
+                            'agent_name': agent_name,
+                            'project_id': entry.get('project_id'),
+                            'event_category': 'llm' if model else 'lifecycle',
+                            'event_type': entry.get('type', role),
+                            'severity': 'info',
+                            'provider': entry.get('provider'),
+                            'model': model,
+                            'input_tokens': inp,
+                            'output_tokens': out,
+                            'summary': str(content)[:200] if content else None,
+                            'payload_json': json.dumps(entry, ensure_ascii=False)[:2000],
+                        })
+
+            except Exception as e:
+                print(f"[WARN] Failed to read {session_file}: {e}")
+
+    return events
+
+# ── Data Source 2: status.json ──────────────────────────
+
+def scan_status_json(conn):
+    """Scan all project status.json files for project flow data."""
+    projects = []
+    for status_file in PROJECTS_HOME.glob('*/monitor/*/status.json'):
+        try:
+            data = json.loads(status_file.read_text())
+            pid = data.get('project_id', status_file.parent.parent.parent.name)
+            wf = data.get('workflow', {})
+            rt = data.get('runtime', {})
+
+            projects.append({
+                'project_id': pid,
+                'current_stage': wf.get('current_stage', 'unknown'),
+                'stage_owner': wf.get('stage_owner'),
+                'stage_enter_time': wf.get('stage_entered_at') or wf.get('stage_enter_time'),
+                'total_elapsed_min': 0,
+                'is_overtime': 0,
+                'latest_artifact': rt.get('latest_commit'),
+                'block_reason': ', '.join(rt.get('current_blockers', [])),
+                'stage_history': json.dumps(wf.get('stage_history', []), ensure_ascii=False),
+                'updated_at': now_cst(),
+            })
+
+            # Upsert project flow
+            conn.execute("""
+                INSERT OR REPLACE INTO agg_project_flow
+                (project_id, current_stage, stage_owner, stage_enter_time,
+                 total_elapsed_min, is_overtime, latest_artifact, block_reason,
+                 stage_history, updated_at)
+                VALUES (:project_id, :current_stage, :stage_owner, :stage_enter_time,
+                        :total_elapsed_min, :is_overtime, :latest_artifact, :block_reason,
+                        :stage_history, :updated_at)
+            """, projects[-1])
+
+        except Exception as e:
+            print(f"[WARN] Failed to read {status_file}: {e}")
+
+    conn.commit()
+    return projects
+
+# ── Data Source 3: Agent workspace status ───────────────
+
+def scan_agent_status(conn):
+    """Determine agent status from workspace files."""
+    agents = ['peter', 'guard', 'doraemon', 'atlas', 'jarvis', 'munger']
+
+    for agent_name in agents:
+        ws = OPENCLAW_HOME / 'workspaces' / agent_name
+        status = 'idle'
+        current_project = None
+        current_task = None
+        current_stage = None
+        last_action = None
+
+        # Check memory files for recent activity
+        memory_dir = ws / 'memory'
+        if memory_dir.exists():
+            today = datetime.now(CST).strftime('%Y-%m-%d')
+            today_file = memory_dir / f'{today}.md'
+            if today_file.exists():
+                mtime = os.path.getmtime(today_file)
+                last_action = datetime.fromtimestamp(mtime, CST).isoformat(timespec='seconds')
+                # If modified in last 30 min, consider active
+                if time.time() - mtime < 1800:
+                    status = 'running'
+
+        # Check active tasks from status files
+        for status_file in PROJECTS_HOME.glob('*/monitor/*/status.json'):
+            try:
+                data = json.loads(status_file.read_text())
+                if data.get('workflow', {}).get('stage_owner') == agent_name:
+                    current_project = data.get('project_id')
+                    current_stage = data.get('workflow', {}).get('current_stage')
+                    rt = data.get('runtime', {})
+                    current_task = ', '.join(rt.get('active_tasks', []))
+                    status = 'running'
+            except:
+                pass
+
+        conn.execute("""
+            INSERT OR REPLACE INTO agg_agent_status
+            (agent_name, status, current_project, current_task, current_stage,
+             task_start_time, last_action_time, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (agent_name, status, current_project, current_task, current_stage,
+              None, last_action, now_cst()))
+
+    conn.commit()
+
+# ── Write Events ────────────────────────────────────────
+
+def write_events(conn, events):
+    """Batch write events to SQLite, skip duplicates."""
+    written = 0
+    for e in events:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO event_log
+                (event_id, event_time, source_type, agent_name, project_id,
+                 event_category, event_type, severity, provider, model,
+                 input_tokens, output_tokens, summary, payload_json)
+                VALUES (:event_id, :event_time, :source_type, :agent_name, :project_id,
+                        :event_category, :event_type, :severity, :provider, :model,
+                        :input_tokens, :output_tokens, :summary, :payload_json)
+            """, e)
+            written += 1
+        except Exception as ex:
+            print(f"[WARN] Write event failed: {ex}")
+
+    conn.commit()
+    return written
+
+# ── Main ────────────────────────────────────────────────
+
+def run_once(conn):
+    """Single collection cycle."""
+    t0 = time.time()
+
+    # Get last run timestamp
+    row = conn.execute("SELECT value FROM collector_state WHERE key='last_run'").fetchone()
+    last_run = float(row[0]) if row else 0
+
+    # Scan data sources
+    events = scan_sessions(conn, last_run)
+    event_count = write_events(conn, events)
+
+    projects = scan_status_json(conn)
+    scan_agent_status(conn)
+
+    # Update last run
+    conn.execute("INSERT OR REPLACE INTO collector_state (key, value) VALUES ('last_run', ?)",
+                 (str(time.time()),))
+    conn.commit()
+
+    elapsed = time.time() - t0
+    print(f"[{now_cst()}] Collected: {event_count} events, {len(projects)} projects in {elapsed:.1f}s")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='AI Team Observability Collector')
+    parser.add_argument('--db', default='data/events.db', help='SQLite database path')
+    parser.add_argument('--once', action='store_true', help='Run once and exit')
+    parser.add_argument('--interval', type=int, default=60, help='Collection interval in seconds')
+    args = parser.parse_args()
+
+    conn = init_db(args.db)
+    print(f"[{now_cst()}] Collector started (db={args.db})")
+
+    if args.once:
+        run_once(conn)
+    else:
+        while True:
+            try:
+                run_once(conn)
+            except Exception as e:
+                print(f"[ERROR] Collection cycle failed: {e}")
+            time.sleep(args.interval)
+
+
+if __name__ == '__main__':
+    main()
