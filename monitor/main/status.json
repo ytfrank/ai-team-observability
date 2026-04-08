@@ -47,19 +47,22 @@
         ]
     },
     "runtime": {
-        "last_runtime_update_at": "2026-04-08T19:23:00+08:00",
-        "last_runtime_update_by": "doraemon",
+        "last_runtime_update_at": "2026-04-09T00:38:00+08:00",
+        "last_runtime_update_by": "peter",
         "active_role": "peter",
         "active_tasks": [
-            "Phase 1: Collector+Schema+API",
-            "Phase 1: 3个前端页面",
-            "Phase 1: 测试用例"
+            "Phase 1 Collector+API+UI 已完成",
+            "Phase 2 联调测试中"
         ],
-        "waiting_on": null,
-        "recent_actions": [
-            "2026-04-08T19:23 小叮当确认技术方案，阶段进入developing",
-            "2026-04-08T19:23 Peter启动Phase 1并行开发"
-        ]
+        "latest_commit": "HEAD",
+        "latest_artifact_update": "2026-04-09T00:38:00+08:00",
+        "latest_evidence_refs": [
+            "commit:feat: Phase 1",
+            "artifact:collector/collector.py",
+            "artifact:api/api_server.py",
+            "artifact:web/static/index.html"
+        ],
+        "current_blockers": []
     },
     "roles": {
         "product_owner": "doraemon",

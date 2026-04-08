@@ -209,6 +209,16 @@ def scan_status_json(conn):
             wf = data.get('workflow', {})
             rt = data.get('runtime', {})
 
+            # Compute progress_verified: True if evidence exists
+            evidence_refs = rt.get('latest_evidence_refs', [])
+            progress_verified = len(evidence_refs) > 0
+
+            # Extract last_real_output_time
+            last_real_output_time = rt.get('last_real_output_time') or rt.get('latest_artifact_update')
+
+            # Extract false_claim_flag
+            false_claim_flag = rt.get('false_claim_flag', False)
+
             projects.append({
                 'project_id': pid,
                 'current_stage': wf.get('current_stage', 'unknown'),
@@ -220,6 +230,10 @@ def scan_status_json(conn):
                 'block_reason': ', '.join(rt.get('current_blockers', [])),
                 'stage_history': json.dumps(wf.get('stage_history', []), ensure_ascii=False),
                 'updated_at': now_cst(),
+                # New fields
+                'progress_verified': progress_verified,
+                'last_real_output_time': last_real_output_time,
+                'false_claim_flag': false_claim_flag,
             })
 
             # Upsert project flow
