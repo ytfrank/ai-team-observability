@@ -133,9 +133,6 @@ def now_cst():
 def scan_sessions(conn, last_run):
     """Scan OpenClaw session JSONL files for agent activity."""
     events = []
-    sessions_dir = OPENCLAW_HOME / 'sessions'
-    if not sessions_dir.exists():
-        return events
 
     for agent_dir in AGENTS_DIR.iterdir():
         if not agent_dir.is_dir():
@@ -162,18 +159,35 @@ def scan_sessions(conn, last_run):
                             continue
 
                         # Extract relevant events
+                        # OpenClaw JSONL: top-level has 'type', 'timestamp'
+                        # For type='message', actual content is nested under 'message' key
                         ts = entry.get('ts', entry.get('timestamp', ''))
-                        role = entry.get('role', '')
-                        model = entry.get('model', '')
-                        usage = entry.get('usage', {})
-                        content = entry.get('content', '')
-
                         if not ts:
                             continue
 
+                        entry_type = entry.get('type', '')
+                        msg = entry.get('message', {})
+
+                        # For message entries, extract from nested 'message' dict
+                        role = msg.get('role', '') if isinstance(msg, dict) else ''
+                        model = msg.get('model', '') if isinstance(msg, dict) else ''
+                        usage = msg.get('usage', {}) if isinstance(msg, dict) else {}
+                        provider = msg.get('provider', entry.get('provider')) if isinstance(msg, dict) else entry.get('provider')
+                        content_raw = msg.get('content', '') if isinstance(msg, dict) else ''
+
+                        # Extract text from content array format
+                        summary = ''
+                        if isinstance(content_raw, list):
+                            for part in content_raw:
+                                if isinstance(part, dict) and part.get('type') == 'text':
+                                    summary = part.get('text', '')[:200]
+                                    break
+                        elif isinstance(content_raw, str):
+                            summary = content_raw[:200]
+
                         eid = event_id(str(session_file), line_no)
-                        inp = usage.get('prompt_tokens', 0) or 0
-                        out = usage.get('completion_tokens', 0) or 0
+                        inp = usage.get('input', 0) or usage.get('prompt_tokens', 0) or 0
+                        out = usage.get('output', 0) or usage.get('completion_tokens', 0) or 0
 
                         events.append({
                             'event_id': eid,
@@ -182,13 +196,13 @@ def scan_sessions(conn, last_run):
                             'agent_name': agent_name,
                             'project_id': entry.get('project_id'),
                             'event_category': 'llm' if model else 'lifecycle',
-                            'event_type': entry.get('type', role),
+                            'event_type': entry_type or role,
                             'severity': 'info',
-                            'provider': entry.get('provider'),
+                            'provider': provider,
                             'model': model,
                             'input_tokens': inp,
                             'output_tokens': out,
-                            'summary': str(content)[:200] if content else None,
+                            'summary': summary or None,
                             'payload_json': json.dumps(entry, ensure_ascii=False)[:2000],
                         })
 
