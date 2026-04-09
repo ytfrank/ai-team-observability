@@ -1,74 +1,63 @@
-# SUBMISSION.md — ai-team-observability V1.0
+# SUBMISSION.md — ai-team-observability V1.0 (验收打回修复)
 
-**提交者**: Peter  
-**日期**: 2026-04-09 13:35  
-**commit**: 67df601  
-**分支**: main  
-**GitHub**: https://github.com/ytfrank/ai-team-observability  
+**提交人**: Peter  
+**提交时间**: 2026-04-10 05:15  
+**commit**: cc8b6b8  
+**类型**: bugfix (验收打回修复)
 
-## 改动概要
+---
 
-### Phase 1: 数据采集 + API + Dashboard UI
+## 修复内容
 
-**1. Event Collector** (`collector/collector.py`)
-- 采集6个数据源：OpenClaw sessions、agent状态、项目status.json
-- 写入SQLite：event_log + agg_agent_status + agg_project_flow + agg_model_usage + alerts
-- 支持 `--once` 单次运行 和 常驻循环模式（默认60s间隔）
+### P1-1: event_log 采集 0 条（核心功能）
 
-**2. API Server** (`api/api_server.py`)
-- REST API：/api/agents, /api/projects, /api/events, /api/stats, /api/alerts
-- 静态页面服务：/, /team/agents, /team/projects, /team/alerts
-- 零依赖，纯Python标准库
+**根因**: `collector.py` 的 `scan_sessions()` 函数有两处 bug：
 
-**3. Dashboard UI** (`web/static/index.html`)
-- 深色主题，30秒自动刷新
-- Agent实时状态卡片（6个agent）
-- 项目流转看板
-- 统计概览（活跃agent数、项目数、24h事件/token数）
+1. **死代码导致 early return**: 函数开头检查 `~/.openclaw/sessions/` 是否存在，该目录不存在导致函数直接返回空列表，**永远不会扫描** `~/.openclaw/agents/*/sessions/*.jsonl`
+2. **字段提取错误**: OpenClaw 的 JSONL 格式中，`role`/`model`/`usage`/`content` 都嵌套在 `message` 字段下，而代码在顶层提取，全部为空
 
-**4. 告警引擎** (`collector/alert_rules.py`)
-- 3条规则：项目超时检测、Agent失联检测、阶段停滞检测
+**修复**:
+- 移除对 `~/.openclaw/sessions/` 的检查（死代码）
+- 修复字段提取：从 `entry['message']` 嵌套结构中读取 role/model/usage/provider/content
+- 修复 token 字段名：使用 `input`/`output` 而非 `prompt_tokens`/`completion_tokens`
+- 修复 content 解析：处理 `[{type: 'text', text: '...'}]` 数组格式
+
+**修复后效果**:
+```
+总事件数: 6776
+  LLM 事件: 2659（含真实 token 数据）
+  生命周期事件: 4117
+
+模型使用（跨6个agent）:
+  zai/glm-5.1:       1,837 calls, 15.2M input, 286K output
+  zai/glm--5:          379 calls, 807K input, 83K output
+  zai/glm-4.7:         227 calls, 1.87M input, 89K output
+  openai-codex/gpt-5.4: 128 calls, 1.84M input, 32K output
+  anthropic/claude-sonnet-4-6: 73 calls, 57 input, 21K output
+  anthropic/claude-opus-4-6:   8 calls
+```
+
+### P1-2: 未部署到 monitor.doramax.cn
+
+不在本次修复范围，需 Atlas 部署。
+
+---
 
 ## 自测结果
 
-| 测试项 | 结果 | 详情 |
-|--------|------|------|
-| Collector 单次运行 | ✅ | 采集6 agents, 4 projects |
-| API /api/stats | ✅ | 返回正确统计数据 |
-| API /api/agents | ✅ | 6个agent状态 |
-| API /api/projects | ✅ | 4个项目信息 |
-| Dashboard 页面 | ✅ | HTTP 200, 自动刷新正常 |
-| GitHub push | ✅ | main分支已推送 |
-
-## 改动文件
-
-| 文件 | 说明 |
-|------|------|
-| collector/collector.py | 事件采集器（核心） |
-| collector/alert_rules.py | 告警规则引擎 |
-| api/api_server.py | REST API + 静态页面服务 |
-| api/main.go | Go版API（未完成，Go未安装） |
-| web/static/index.html | Dashboard主页 |
-| web/static/agents.html | Agent详情页（占位） |
-| web/static/projects.html | 项目详情页（占位） |
-| web/static/alerts.html | 告警页（占位） |
-
-## 风险
-
-- Go未安装，API暂用Python实现（性能可接受）
-- Collector 采集 session 文件目前为空（需配置OpenClaw session路径）
-- 前端详情页尚未开发（Phase 2）
-- 尚未部署到 monitor.doramax.cn
+- ✅ `python3 collector/collector.py --once` → 6776 events collected
+- ✅ API `/api/events` 返回真实数据
+- ✅ API `/api/stats` 返回真实 token 统计
+- ✅ 各 agent 均有事件数据（doraemon/atlas/peter/guard/main/dasheng）
 
 ## 测试重点
 
-1. Collector 是否正确采集 agent 和项目数据
-2. API 返回数据是否准确
-3. Dashboard 是否正常渲染
-4. 告警规则是否触发
+1. `GET /api/events?category=llm` → 应返回 2659+ 条 LLM 事件
+2. `GET /api/stats` → tokens_24h 应有非零值
+3. Dashboard 页面 event_log 列表应显示真实数据
+4. 验收标准 #1（多 provider 调用和 token 趋势）和 #5（回放任务关键轨迹）
 
-## 部署要求
+## 注意事项
 
-- Python 3.10+
-- 无额外依赖（纯标准库）
-- SQLite 数据库自动创建
+- DB 已重建（`data/events.db`），需确认 API server 指向正确路径
+- 部署仍需 Atlas 执行（验收标准 #7）
