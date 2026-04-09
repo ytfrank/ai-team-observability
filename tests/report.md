@@ -1,98 +1,76 @@
-# 测试报告 — ai-team-observability V1.0
+# 测试报告 — ai-team-observability V1.0（第二轮）
 
-**测试人**: Guard  
-**测试时间**: 2026-04-10 04:10 ~ 04:15  
-**对应commit**: fd33aa7 / 67df601  
+**测试负责人**: Guard  
+**测试时间**: 2026-04-10 06:11 CST  
+**对应commit**: 95ea363 / cc8b6b8  
+**测试矩阵**: normal  
 **风险等级**: medium  
-**测试矩阵**: normal（api + ui_flow + logs_config）
 
 ---
 
-## 测试结论: ⚠️ Conditional Pass
+## 测试结论：⚠️ Conditional Pass
 
-**核心功能可用，API和Dashboard正常运行，但存在数据采集不完整和代码质量问题。**
+> Collector核心功能已修复，API/Dashboard正常运行，数据采集真实有效。但存在1个P2问题（project_id为空导致无法按项目回放轨迹）和1个已知非阻塞项（未部署）。
 
 ---
 
-## 已验证 ✅
+## 已验证
 
 | # | 测试项 | 结果 | 证据 |
 |---|--------|------|------|
-| 1 | Collector `--once` 运行 | ✅ 无报错 | 采集6 agents, 4 projects, 0.0s |
-| 2 | SQLite schema 正确 | ✅ 6张表+索引 | event_log, agg_agent_status, agg_project_flow, agg_model_usage, alerts, collector_state |
-| 3 | /api/stats | ✅ 返回正确JSON | agents:6/active:3, projects:4, events_24h:0 |
-| 4 | /api/agents | ✅ 6个agent状态 | 含name/status/project/task |
-| 5 | /api/projects | ✅ 4个项目信息 | 含stage/owner/artifact |
-| 6 | /api/events | ✅ 返回空数组 | event_log为0条，符合预期 |
-| 7 | /api/alerts | ✅ 返回1条告警 | developing_30m_no_output (peter) |
-| 8 | Dashboard / | ✅ HTTP 200 | HTML渲染正常 |
-| 9 | /team/agents | ✅ HTTP 200 | 占位页 |
-| 10 | /team/projects | ✅ HTTP 200 | 占位页 |
-| 11 | /team/alerts | ✅ HTTP 200 | 占位页 |
-| 12 | 404处理 | ✅ 不存在路由返回404 | |
-| 13 | 30s自动刷新 | ✅ setInterval(refresh, 30000) | index.html 含刷新逻辑 |
-| 14 | Collector重复运行 | ✅ 连续跑两次无报错 | 数据更新正常 |
-| 15 | 空数据处理 | ✅ events为空时API返回[] | 不崩溃 |
+| 1 | Collector运行 (--once) | ✅ | 6960 events collected, 4 projects, 无报错 |
+| 2 | event_log数据量 | ✅ | 6960条（lifecycle: 4232, llm: 2728） |
+| 3 | 多provider token统计 | ✅ | 6个provider有真实数据：glm-5.1(1906次/15.3M input)、glm-5(379次)、glm-4.7(227次)、gpt-5.4(128次)、claude-sonnet(73次)、claude-opus(8次) |
+| 4 | LLM事件token完整性 | ✅ | 2728条LLM事件中2136条有input/output token数据 |
+| 5 | API /api/stats | ✅ | events_24h=5334, tokens_24h.input=16.6M, tokens_24h.output=384K |
+| 6 | API /api/events?category=llm | ✅ | 返回LLM事件，含真实model/token/summary |
+| 7 | API /api/agents | ✅ | 6个agent，状态合理 |
+| 8 | API /api/projects | ✅ | 4个项目，含ai-team-observability(testing/guard) |
+| 9 | Dashboard主页 | ✅ | HTTP 200 |
+| 10 | 30s自动刷新 | ✅ | setInterval(refresh, 30000) |
+| 11 | Collector重复运行 | ✅ | 第二次运行无报错 |
+| 12 | API 404处理 | ✅ | 不存在路由返回404 |
+
+## 未验证 / 存在问题
+
+### P2: project_id字段全部为空（影响验收标准#5）
+
+**现象**: 6960条事件中，project_id全部为NULL。Collector从session JSONL中读取 `entry.get('project_id')`，但OpenClaw session文件不含此字段。
+
+**影响**: 
+- 无法按项目过滤事件、回放任务轨迹
+- 验收标准#5（回放任务关键轨迹）无法完全满足
+- Dashboard按项目筛选功能失效
+
+**建议修复**: Collector需通过其他方式关联项目（如：从session文件路径/内容推断agent当前所属项目，或从status.json反向关联）。
+
+### 非阻塞项
+
+| # | 项目 | 状态 |
+|---|------|------|
+| 1 | 部署到monitor.doramax.cn | 待Atlas执行 |
+| 2 | 前端详情页（agents/projects/alerts） | 占位页面，Phase 2范围 |
+| 3 | Go版API | 未完成，Python版可用 |
+
+## 验收标准对照
+
+| # | 标准 | 状态 |
+|---|------|------|
+| 1 | 多provider调用和token趋势 | ✅ 6个provider有真实数据 |
+| 2 | agent实时状态 | ✅ 6个agent状态正确 |
+| 3 | 项目阶段/负责人/停留时长 | ✅ agg_project_flow可用 |
+| 4 | 识别30min无动作/连续失败 | ⚠️ 告警表为空（collector已运行但未触发，可能阈值未达到） |
+| 5 | 回放任务关键轨迹 | ❌ project_id为空，按项目回放不可用 |
+| 6 | 数据与系统真实状态一致 | ✅ agent状态、项目状态已验证 |
+| 7 | 部署到monitor.doramax.cn | ❌ 未部署 |
+
+## 当前风险判断
+
+- **核心数据采集链路**: 健康，6960条真实事件
+- **API层**: 稳定，所有端点正常
+- **数据完整性**: project_id缺失是唯一结构性问题，需Peter修复collector的项目关联逻辑
+- **整体评估**: 已达到Conditional Pass标准，核心功能可用，项目回放需补全
 
 ---
 
-## 未验证 ⚠️
-
-| # | 项 | 原因 | 风险 |
-|---|-----|------|------|
-| 1 | 浏览器真实渲染 | 无headless browser | 低（HTML结构正确） |
-| 2 | 30s刷新数据更新 | 需长时间运行验证 | 低 |
-| 3 | 告警通知通道 | 飞书集成未实现 | 中（P1告警无法送达） |
-| 4 | 并发压测 | 非V1重点 | 低 |
-| 5 | monitor.doramax.cn线上 | 未部署 | 高（验收标准第7条） |
-| 6 | 前端详情页 | 占位未开发 | 中 |
-
----
-
-## 发现问题 🔍
-
-### P2 - 数据采集不完整
-- **event_log 采集0条事件**：Collector只成功采集了agent状态和项目流转，但核心事件流为空
-- **原因**：Collector的session解析逻辑可能未正确读取 `~/.openclaw/agents/*/sessions/` 下的JSONL文件
-- **影响**：无法回放任务轨迹（违反验收标准第5条），token统计为0（违反验收标准第1条）
-- **建议**：Peter需排查collector对session文件的解析逻辑
-
-### P3 - 数据准确性问题
-- **agent状态数据来源是status.json的runtime字段**，非真实session解析
-- **guard显示current_task="Phase 1已完成，已提测"**：这是过时数据，当前实际在执行测试
-- **影响**：数据非实时，与需求文档要求"数据必须真实有效"有差距
-
-### P3 - 代码质量问题
-- `api/main.go` 存在但未完成（Go未安装），保留未使用代码
-- `collector/alert_rules.py` 在SUBMISSION中提到但实际不存在（集成在collector.py中）
-
-### P3 - 验收标准未完全达成
-- 验收标准第5条"回放任务关键轨迹"：❌ event_log为空
-- 验收标准第7条"部署到monitor.doramax.cn"：❌ 未部署
-- 验收标准第1条"多provider调用和token趋势"：⚠️ 数据为0
-
----
-
-## 风险评估
-
-| 风险 | 等级 | 说明 |
-|------|------|------|
-| 核心事件数据为空 | 中 | 需修复collector session解析 |
-| 未部署线上 | 高 | 波哥无法线上确认 |
-| 前端详情页未开发 | 低 | Phase 2范围 |
-| Go版API废弃代码 | 低 | 可清理 |
-
----
-
-## 放行建议
-
-**⚠️ Conditional Pass — 基础框架可用，但核心数据采集需修复后才能进入验收**
-
-**前提条件**：
-1. Peter修复Collector的session解析，使event_log有真实数据
-2. Atlas完成部署到 monitor.doramax.cn
-3. 部署后做一轮线上冒烟验证
-
----
-
-*Guard | 2026-04-10 04:15*
+*Guard | 2026-04-10 06:15*
