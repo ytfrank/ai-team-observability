@@ -1,10 +1,10 @@
 {
   "project": "ai-team-observability",
   "version": 7,
-  "lifecycle": "active",
+  "lifecycle": "cancelled",
   "created_at": "2026-04-15T10:15:00+08:00",
   "workflow": {
-    "current_stage": "developing",
+    "current_stage": "cancelled",
     "stage_history": [
       {
         "stage": "draft",
@@ -20,16 +20,16 @@
       }
     ],
     "stage_owner": "peter",
-    "stage_status": "in_progress",
+    "stage_status": "cancelled",
     "stage_entered_at": "2026-04-15T08:23:00+08:00",
-    "exception_state": "dev_progress_stalled",
+    "exception_state": null,
     "exception_since": "2026-04-15T08:23:00+08:00",
     "exception_note": "developing阶段已进入6小时，但无任何commit或artifact更新。TECH_PLAN.md缺失，dev目录为空。已通过A2A询问Peter，Peter承认未启动开发，承诺30分钟内补齐TECH_PLAN.md。"
   },
   "official": {
-    "updated_at": "2026-04-15T14:15:00+08:00",
+    "updated_at": "2026-04-15T06:41:25+08:00",
     "updated_by": "doraemon",
-    "summary": "developing (异常). Peter承诺TECH_PLAN.md 30分钟内，首个可验证产物今天下午。",
+    "summary": "项目取消。Peter未启动开发，目录为空，无代码产出。2026-04-15 14:40 小叮当最终裁定。后续迭代可作为新项目重新启动。",
     "blocking": null,
     "risks": [
       "图表渲染性能（Chart.js/ECharts）",
@@ -41,7 +41,8 @@
       "Collector必须正确识别项目版本，数据不混淆",
       "项目结构修正：V1使用monitor/v1/，V2使用monitor/v2/，V3使用monitor/v3/"
     ],
-    "next_action": "持续监控TECH_PLAN.md产出进度"
+    "next_action": "持续监控TECH_PLAN.md产出进度",
+    "decision": "cancelled_no_progress"
   },
   "runtime": {
     "last_runtime_update_at": "2026-04-15T14:15:00+08:00",
