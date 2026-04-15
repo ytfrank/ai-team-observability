@@ -109,9 +109,9 @@
   },
   "history": [
     {
-      "time": "2026-04-15T14:15:00+08:00",
+      "time": "2026-04-15T14:20:00+08:00",
       "actor": "小叮当",
-      "action": "修正项目结构：monitor/v1/ (V1), monitor/v2/ (V2), monitor/v3/ (V3)"
+      "action": "修正项目结构：main分支monitor/main/→monitor/v1/，v2分支monitor/main/→monitor/v2/，v3分支删除monitor/main/，确保每个版本只使用对应的monitor/{version}/目录"
     },
     {
       "time": "2026-04-15T10:15:00+08:00",
