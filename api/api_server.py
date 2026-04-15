@@ -163,11 +163,24 @@ class MonitorHandler(BaseHTTPRequestHandler):
     def _api_alerts(self, params):
         conn = self.get_db()
         try:
-            rows = conn.execute("SELECT * FROM alerts ORDER BY alert_time DESC LIMIT 50").fetchall()
+            limit = self._parse_limit(params.get('limit', [50])[0], default=50, maximum=200)
+            rows = conn.execute(
+                "SELECT * FROM alerts ORDER BY alert_time DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
             alerts = [dict(r) for r in rows]
             self.json_response(alerts)
         finally:
             conn.close()
+
+    def _parse_limit(self, raw_limit, default=100, maximum=500):
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            return default
+        if limit < 1:
+            return default
+        return min(limit, maximum)
 
     def log_message(self, format, *args):
         print(f"[{self.log_date_time_string()}] {args[0]}")
