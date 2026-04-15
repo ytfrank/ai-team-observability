@@ -1,0 +1,123 @@
+{
+  "project": "ai-team-observability",
+  "version": 7,
+  "lifecycle": "active",
+  "created_at": "2026-04-15T10:15:00+08:00",
+  "workflow": {
+    "current_stage": "developing",
+    "stage_history": [
+      {
+        "stage": "draft",
+        "entered_at": "2026-04-15T10:15:00+08:00",
+        "exited_at": "2026-04-15T10:15:00+08:00",
+        "note": "小叮当编写V3需求文档（基于V2测试FAIL结果）"
+      },
+      {
+        "stage": "planned",
+        "entered_at": "2026-04-15T10:15:00+08:00",
+        "exited_at": "2026-04-15T08:23:00+08:00",
+        "note": "波哥确认V3需求"
+      }
+    ],
+    "stage_owner": "peter",
+    "stage_status": "in_progress",
+    "stage_entered_at": "2026-04-15T08:23:00+08:00",
+    "exception_state": null,
+    "exception_since": null,
+    "exception_note": null
+  },
+  "official": {
+    "updated_at": "2026-04-15T10:15:00+08:00",
+    "updated_by": "doraemon",
+    "summary": "developing. Peter已接收开发任务，基于V2代码迭代修复P0数据准确性、P1可视化、P2体验优化。",
+    "blocking": null,
+    "risks": [
+      "图表渲染性能（Chart.js/ECharts）",
+      "成果物预览需处理多种文件类型"
+    ],
+    "decisions": [
+      "基于V2代码迭代，不重写",
+      "纯Python+SQLite+Vanilla JS + Chart.js/ECharts CDN",
+      "Collector必须正确识别项目版本，数据不混淆",
+      "项目结构修正：一个git仓库，通过分支管理版本（main/v2/v3）"
+    ],
+    "next_action": "Peter开发P0/P1功能，collector版本隔离+前端图表化"
+  },
+  "runtime": {
+    "last_runtime_update_at": "2026-04-15T10:15:00+08:00",
+    "last_runtime_update_by": "doraemon",
+    "active_role": "peter",
+    "active_tasks": [
+      "P0-1: Collector版本隔离与数据准确性",
+      "P0-2: 项目列表版本分组",
+      "P0-3: 成果物预览与下载",
+      "P1: Agent事件图表化 / Token趋势图 / 告警中心"
+    ],
+    "latest_evidence_refs": [
+      "artifact:REQUIREMENTS.md"
+    ],
+    "waiting_on": null,
+    "recent_actions": [
+      "小叮当修正项目结构：统一git仓库，通过分支管理版本"
+    ]
+  },
+  "roles": {
+    "product_owner": "doraemon",
+    "developer": "peter",
+    "qa": "guard",
+    "ops": "atlas"
+  },
+  "artifacts": {
+    "requirements": {
+      "path": "monitor/v3/requirements/REQUIREMENTS.md",
+      "status": "confirmed",
+      "owner": "doraemon",
+      "updated_at": "2026-04-15T08:23:00+08:00"
+    },
+    "tech_plan": {
+      "path": "monitor/v3/dev/TECH_PLAN.md",
+      "status": "pending",
+      "owner": "peter"
+    },
+    "submission": {
+      "path": "monitor/v3/dev/SUBMISSION.md",
+      "status": "pending",
+      "owner": "peter"
+    },
+    "qa_report": {
+      "path": "monitor/v3/qa/report.md",
+      "status": "pending",
+      "owner": "guard"
+    },
+    "acceptance": {
+      "path": "monitor/v3/acceptance/ACCEPTANCE.md",
+      "status": "pending",
+      "owner": "doraemon"
+    },
+    "deploy_report": {
+      "path": "monitor/v3/deploy/DEPLOY_REPORT.md",
+      "status": "pending",
+      "owner": "atlas"
+    }
+  },
+  "v2_baseline": {
+    "repo": "/Users/bibo/projects/ai-team-observability",
+    "domain": "monitor.doramax.cn",
+    "last_deploy": "2026-04-14",
+    "test_result": "FAIL (5 P0 + 2 P1 + 6 P2)"
+  },
+  "history": [
+    {
+      "time": "2026-04-15T10:15:00+08:00",
+      "actor": "小叮当",
+      "action": "修正项目结构：统一git仓库，通过分支管理版本（main/v2/v3）"
+    },
+    {
+      "time": "2026-04-15T08:23:00+08:00",
+      "actor": "波哥",
+      "action": "确认V3需求"
+    }
+  ],
+  "handoffs": {},
+  "artifacts_base_path": "monitor/v3/"
+}
