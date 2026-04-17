@@ -4,7 +4,7 @@
   "lifecycle": "active",
   "created_at": "2026-04-15T10:15:00+08:00",
   "workflow": {
-    "current_stage": "cancelled",
+    "current_stage": "developing",
     "stage_history": [
       {
         "stage": "draft",
@@ -20,17 +20,29 @@
       }
     ],
     "stage_owner": "peter",
-    "stage_status": "cancelled",
-    "stage_entered_at": "2026-04-15T08:23:00+08:00",
-    "exception_state": null,
-    "exception_since": "2026-04-15T08:23:00+08:00",
-    "exception_note": "developing阶段已进入6小时，但无任何commit或artifact更新。TECH_PLAN.md缺失，dev目录为空。已通过A2A询问Peter，Peter承认未启动开发，承诺30分钟内补齐TECH_PLAN.md。"
+    "stage_status": "active",
+    "stage_entered_at": "2026-04-17T08:05:00+08:00",
+    "exception_state": "blocked_escalated",
+    "exception_since": "2026-04-17T09:40:00+08:00",
+    "exception_note": "Peter A2A催办3次无响应（09:40/10:00/11:00），runtime 48h+未更新，无任何代码产出。升级波哥决策。",
+    "history": [
+      {
+        "time": "2026-04-17T08:05:00+08:00",
+        "event": "lifecycle restored to active by 小叮当 per 波哥指示",
+        "stage": "cancelled->developing"
+      },
+      {
+        "time": "2026-04-17T09:53:00+08:00",
+        "event": "Peter A2A反馈：流程执行异常（方案未执行+主线程擅自动手+SUBMISSION骨架误导+状态失真+缺sub-agent留痕）。小叮当承认PMO操作问题。等待策略校正。",
+        "stage": "developing"
+      }
+    ]
   },
   "official": {
-    "updated_at": "2026-04-15T06:41:25+08:00",
+    "updated_at": "2026-04-17T09:53:00+08:00",
     "updated_by": "doraemon",
-    "summary": "项目取消。Peter未启动开发，目录为空，无代码产出。2026-04-15 14:40 小叮当最终裁定。后续迭代可作为新项目重新启动。",
-    "blocking": null,
+    "summary": "流程执行异常。TECH_PLAN规划了3个sub-agent但启动数为0，主线程擅自动手局部实现，status.json曾被我多次不当操作导致失真。Peter正在补策略校正。等待：1)策略确认 2)sub-agent真实启动 3)P0代码commit",
+    "blocking": "开发策略未确认，等待Peter补完TECH_PLAN策略校正后恢复",
     "risks": [
       "图表渲染性能（Chart.js/ECharts）",
       "成果物预览需处理多种文件类型"
@@ -41,8 +53,8 @@
       "Collector必须正确识别项目版本，数据不混淆",
       "项目结构修正：V1使用monitor/v1/，V2使用monitor/v2/，V3使用monitor/v3/"
     ],
-    "next_action": "持续监控TECH_PLAN.md产出进度",
-    "decision": "cancelled_no_progress"
+    "next_action": "Peter补策略校正→确认编排方案→恢复开发",
+    "decision": "restored_by_bibo_order"
   },
   "runtime": {
     "last_runtime_update_at": "2026-04-15T14:15:00+08:00",
@@ -109,6 +121,11 @@
     "test_result": "FAIL (5 P0 + 2 P1 + 6 P2)"
   },
   "history": [
+    {
+      "time": "2026-04-16T13:42:00+08:00",
+      "actor": "波哥",
+      "action": "指示：撤销小叮当错误取消裁定，恢复项目active。规则：只有波哥能取消项目。"
+    },
     {
       "time": "2026-04-15T14:20:00+08:00",
       "actor": "小叮当",

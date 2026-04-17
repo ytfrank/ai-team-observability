@@ -28,13 +28,30 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
 .status-blocked { background: #7f1d1d; color: #fca5a5; }
 .agent-card .detail { font-size: 13px; color: #94a3b8; margin-top: 8px; }
 .agent-card .detail span { color: #e2e8f0; }
-.projects-list { margin-top: 32px; }
-.project-row { background: #1e293b; border-radius: 8px; padding: 16px 20px; margin-bottom: 8px; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr; align-items: center; border: 1px solid #334155; }
-.project-row .name { font-weight: 600; }
-.project-row .stage { padding: 3px 10px; border-radius: 20px; font-size: 11px; background: #1e3a5f; color: #93c5fd; display: inline-block; }
-.project-row .blocked { color: #fca5a5; font-size: 12px; }
+.projects-list { margin-top: 32px; display: grid; gap: 14px; }
+.project-group { background: #1e293b; border-radius: 14px; border: 1px solid #334155; overflow: hidden; }
+.project-group summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; }
+.project-group summary::-webkit-details-marker { display: none; }
+.project-group .group-main { display: flex; flex-direction: column; gap: 6px; }
+.project-group .group-name { font-size: 16px; font-weight: 700; }
+.project-group .group-meta { font-size: 12px; color: #94a3b8; }
+.project-group .versions { padding: 0 18px 18px; display: grid; gap: 10px; }
+.project-version { border: 1px solid #334155; border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1.2fr .9fr .9fr .8fr 1.4fr; gap: 10px; align-items: center; background: rgba(15, 23, 42, 0.45); }
+.project-version.active { border-color: #ef4444; box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.35); }
+.project-version.archived { opacity: .62; }
+.version-name { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.version-tag, .active-tag, .stage { padding: 3px 10px; border-radius: 999px; font-size: 11px; display: inline-block; }
+.version-tag { background: #334155; color: #cbd5e1; }
+.active-tag { background: #7f1d1d; color: #fecaca; }
+.stage { background: #1e3a5f; color: #93c5fd; }
+.blocked { color: #fca5a5; font-size: 12px; }
+.project-link { color: #38bdf8; text-decoration: none; font-size: 12px; }
 .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #e2e8f0; }
 .refresh-info { font-size: 11px; color: #64748b; text-align: right; margin-bottom: 8px; }
+@media (max-width: 900px) {
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .project-version { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -101,17 +118,69 @@ async function renderAgents() {
   `).join('');
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+}
+
+function parseProject(projectId) {
+  const raw = String(projectId || '').trim();
+  if (!raw) return null;
+  const match = raw.match(/^(.*?)(?:-(v\d+(?:\.\d+)?))$/i);
+  return match ? { baseName: match[1], versionLabel: match[2].toUpperCase(), rawName: raw } : { baseName: raw, versionLabel: '主线', rawName: raw };
+}
+
+function isArchivedStage(stage) {
+  return ['done', 'archived', 'cancelled'].includes(String(stage || '').toLowerCase());
+}
+
+function groupProjects(projects) {
+  const groups = new Map();
+  projects.forEach((project) => {
+    const parsed = parseProject(project.project_id);
+    if (!parsed) return;
+    const item = { ...project, ...parsed };
+    if (!groups.has(item.baseName)) groups.set(item.baseName, []);
+    groups.get(item.baseName).push(item);
+  });
+  return [...groups.entries()].map(([baseName, versions]) => {
+    versions.sort((a, b) => {
+      const activeDelta = Number(isArchivedStage(a.current_stage)) - Number(isArchivedStage(b.current_stage));
+      if (activeDelta !== 0) return activeDelta;
+      return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+    });
+    const active = versions.find((item) => !isArchivedStage(item.current_stage)) || versions[0];
+    return { baseName, versions, active };
+  }).sort((a, b) => new Date(b.active?.updated_at || 0) - new Date(a.active?.updated_at || 0));
+}
+
 async function renderProjects() {
   const projects = await fetchJSON(API + '/api/projects');
-  document.getElementById('projects').innerHTML = projects.map(p => `
-    <div class="project-row">
-      <div class="name">${p.project_id}</div>
-      <div><span class="stage">${p.current_stage}</span></div>
-      <div style="color:#94a3b8;font-size:13px">${p.stage_owner || '—'}</div>
-      <div style="color:#94a3b8;font-size:13px">${p.is_overtime ? '⚠️ 超时' : ''}</div>
-      <div class="blocked">${p.block_reason || ''}</div>
-    </div>
-  `).join('');
+  const grouped = groupProjects(projects);
+  document.getElementById('projects').innerHTML = grouped.map((group) => `
+    <details class="project-group" open>
+      <summary>
+        <div class="group-main">
+          <div class="group-name">${escapeHtml(group.baseName)}</div>
+          <div class="group-meta">共 ${group.versions.length} 个版本，活跃版本 ${escapeHtml(group.active?.versionLabel || '—')}</div>
+        </div>
+        <a class="project-link" href="/team/projects">查看详情 →</a>
+      </summary>
+      <div class="versions">
+        ${group.versions.map((p) => `
+          <div class="project-version ${p.rawName === group.active?.rawName ? 'active' : ''} ${isArchivedStage(p.current_stage) ? 'archived' : ''}">
+            <div>
+              <div class="version-name">${escapeHtml(p.rawName)} <span class="version-tag">${escapeHtml(p.versionLabel)}</span> ${p.rawName === group.active?.rawName ? '<span class="active-tag">活跃</span>' : ''}</div>
+              <div style="color:#94a3b8;font-size:12px;margin-top:6px">更新于 ${timeAgo(p.updated_at)}</div>
+            </div>
+            <div><span class="stage">${escapeHtml(p.current_stage || 'unknown')}</span></div>
+            <div style="color:#94a3b8;font-size:13px">${escapeHtml(p.stage_owner || '—')}</div>
+            <div style="color:#94a3b8;font-size:13px">${p.is_overtime ? '⚠️ 超时' : '正常'}</div>
+            <div class="blocked">${escapeHtml(p.block_reason || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </details>
+  `).join('') || '<div style="color:#94a3b8">暂无项目数据</div>';
 }
 
 async function refresh() {
