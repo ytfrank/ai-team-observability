@@ -22,9 +22,9 @@
     "stage_owner": "peter",
     "stage_status": "active",
     "stage_entered_at": "2026-04-17T08:05:00+08:00",
-    "exception_state": "blocked_escalated",
-    "exception_since": "2026-04-17T09:40:00+08:00",
-    "exception_note": "Peter A2A催办3次无响应（09:40/10:00/11:00），runtime 48h+未更新，无任何代码产出。升级波哥决策。",
+    "exception_state": null,
+    "exception_since": null,
+    "exception_note": null,
     "history": [
       {
         "time": "2026-04-17T08:05:00+08:00",
@@ -35,14 +35,19 @@
         "time": "2026-04-17T09:53:00+08:00",
         "event": "Peter A2A反馈：流程执行异常（方案未执行+主线程擅自动手+SUBMISSION骨架误导+状态失真+缺sub-agent留痕）。小叮当承认PMO操作问题。等待策略校正。",
         "stage": "developing"
+      },
+      {
+        "time": "2026-04-18T00:42:00+08:00",
+        "event": "小叮当review: Peter新commit 8eead33 (1000行变更)，异常状态清除，A2A催详细进展+SUBMISSION",
+        "stage": "developing"
       }
     ]
   },
   "official": {
-    "updated_at": "2026-04-17T09:53:00+08:00",
+    "updated_at": "2026-04-18T00:42:00+08:00",
     "updated_by": "doraemon",
-    "summary": "流程执行异常。TECH_PLAN规划了3个sub-agent但启动数为0，主线程擅自动手局部实现，status.json曾被我多次不当操作导致失真。Peter正在补策略校正。等待：1)策略确认 2)sub-agent真实启动 3)P0代码commit",
-    "blocking": "开发策略未确认，等待Peter补完TECH_PLAN策略校正后恢复",
+    "summary": "Peter恢复产出，commit 8eead33 (2026-04-18 00:03) 包含P0数据隔离+collector修复+项目页版本分组，1000行变更。已A2A催促提交详细进展报告和SUBMISSION.md。",
+    "blocking": null,
     "risks": [
       "图表渲染性能（Chart.js/ECharts）",
       "成果物预览需处理多种文件类型"
@@ -53,11 +58,11 @@
       "Collector必须正确识别项目版本，数据不混淆",
       "项目结构修正：V1使用monitor/v1/，V2使用monitor/v2/，V3使用monitor/v3/"
     ],
-    "next_action": "Peter补策略校正→确认编排方案→恢复开发",
+    "next_action": "等待Peter回复详细进展 → P0完成后提测",
     "decision": "restored_by_bibo_order"
   },
   "runtime": {
-    "last_runtime_update_at": "2026-04-15T14:15:00+08:00",
+    "last_runtime_update_at": "2026-04-18T00:42:00+08:00",
     "last_runtime_update_by": "doraemon",
     "active_role": "peter",
     "active_tasks": [
@@ -67,13 +72,15 @@
       "P1: Agent事件图表化 / Token趋势图 / 告警中心"
     ],
     "latest_evidence_refs": [
-      "artifact:REQUIREMENTS.md"
+      "commit:8eead33 feat(v3): P0 data isolation + collector fix + projects page version grouping",
+      "artifact:monitor/v3/dev/STAGE_SUMMARY.md"
     ],
     "waiting_on": null,
     "recent_actions": [
       "小叮当修正项目结构：monitor/v1/ (V1), monitor/v2/ (V2), monitor/v3/ (V3)",
       "Peter A2A汇报：未开始开发，monitor/v3/dev/目录为空，TECH_PLAN.md未写，责任在他"
-    ]
+    ],
+    "latest_commit": "8eead33b8ae04c4b282ffeefc3c2c2d4228e0008"
   },
   "roles": {
     "product_owner": "doraemon",
