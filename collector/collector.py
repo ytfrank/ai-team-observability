@@ -140,10 +140,14 @@ def ensure_schema(conn):
         }
     }
     for table, columns in expected.items():
-        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        try:
+            existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        except Exception:
+            continue
         for column, sql_type in columns.items():
             if column not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+        conn.commit()
 
 
 def normalize_base_project(project_id, fallback_name):
