@@ -160,6 +160,7 @@ class MonitorHandler(BaseHTTPRequestHandler):
             if not agent_row:
                 return self.json_response({'error': 'agent not found'}, status=404)
 
+            limit = self._parse_limit(params.get('limit', [100])[0], default=100, maximum=500)
             rows = conn.execute(
                 """
                 SELECT event_id, event_time, agent_name, project_id, event_category, event_type,
@@ -167,9 +168,9 @@ class MonitorHandler(BaseHTTPRequestHandler):
                 FROM event_log
                 WHERE agent_name = ? AND event_time >= ?
                 ORDER BY event_time DESC
-                LIMIT 500
+                LIMIT ?
                 """,
-                (agent, start_time.isoformat()),
+                (agent, start_time.isoformat(), limit),
             ).fetchall()
             events = [dict(row) for row in rows]
             timeline = [self._normalize_agent_event(event) for event in events]
@@ -342,6 +343,25 @@ class MonitorHandler(BaseHTTPRequestHandler):
                 """
             ).fetchone()[0]
 
+            collector_rows = {
+                row[0]: row[1]
+                for row in conn.execute(
+                    "SELECT key, value FROM collector_state WHERE key IN ('last_run', 'last_alert_run')"
+                ).fetchall()
+            }
+            last_run_ts = collector_rows.get('last_run')
+            last_collector_run = None
+            collector_status = 'unknown'
+            if last_run_ts:
+                try:
+                    last_collector_run = datetime.fromtimestamp(
+                        float(last_run_ts), tz=timezone.utc
+                    ).isoformat(timespec='seconds')
+                    age_seconds = (datetime.now(timezone.utc) - datetime.fromtimestamp(float(last_run_ts), tz=timezone.utc)).total_seconds()
+                    collector_status = 'ok' if age_seconds < 300 else 'stale'
+                except (ValueError, TypeError):
+                    pass
+
             self.json_response({
                 'agents': {
                     'total': agent_total,
@@ -361,6 +381,8 @@ class MonitorHandler(BaseHTTPRequestHandler):
                     'output': tokens[1],
                     'delta': self._trend(tokens[0] + tokens[1], prev_tokens),
                 },
+                'last_collector_run': last_collector_run,
+                'collector_status': collector_status,
             })
         finally:
             conn.close()
@@ -369,7 +391,14 @@ class MonitorHandler(BaseHTTPRequestHandler):
         conn = self.get_db()
         try:
             limit = self._parse_limit(params.get('limit', [50])[0], default=50, maximum=200)
-            rows = conn.execute('SELECT * FROM alerts ORDER BY alert_time DESC LIMIT ?', (limit,)).fetchall()
+            try:
+                offset = max(0, int(params.get('offset', [0])[0]))
+            except (TypeError, ValueError):
+                offset = 0
+            rows = conn.execute(
+                'SELECT * FROM alerts ORDER BY alert_time DESC LIMIT ? OFFSET ?',
+                (limit, offset),
+            ).fetchall()
             self.json_response([dict(r) for r in rows])
         finally:
             conn.close()

@@ -53,6 +53,10 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
 .project-link { color: #38bdf8; text-decoration: none; font-size: 12px; }
 .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #e2e8f0; }
 .refresh-info { font-size: 11px; color: #64748b; text-align: right; margin-bottom: 8px; }
+.freshness-banner { border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+.freshness-ok { background: #1e293b; border: 1px solid #334155; color: #94a3b8; }
+.freshness-stale { background: rgba(127,29,29,.35); border: 1px solid #ef4444; color: #fca5a5; }
+.group-done-badge { background: #334155; color: #94a3b8; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 @media (max-width: 900px) {
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
   .project-version { grid-template-columns: 1fr; }
@@ -70,6 +74,7 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
 </nav>
 
 <div class="container">
+  <div id="freshness-banner"></div>
   <div class="stats-bar" id="stats"></div>
 
   <div class="section-title">🤖 Agent 实时状态</div>
@@ -122,6 +127,16 @@ async function renderStats() {
     <a class="stat-card" href="/team/agents#recent-events"><div class="label">24h事件</div><div class="value">${stats.events_24h}</div><div class="sub">点击查看最近事件</div>${trendMarkup(stats.events_delta)}</a>
     <a class="stat-card" href="/team/projects?filter=blocked"><div class="label">阻塞项目</div><div class="value" style="color:#fca5a5">${stats.projects.blocked}</div><div class="sub">点击筛选 blocked 项目</div>${trendMarkup(stats.projects.blocked_delta)}</a>
   `;
+  renderFreshness(stats.last_collector_run);
+}
+
+function renderFreshness(lastRun) {
+  const banner = document.getElementById('freshness-banner');
+  if (!lastRun) { banner.innerHTML = ''; return; }
+  const ageMin = (Date.now() - new Date(lastRun).getTime()) / 60000;
+  const timeStr = new Date(lastRun).toLocaleString('zh-CN', { hour12: false });
+  const stale = ageMin > 10;
+  banner.innerHTML = `<div class="freshness-banner ${stale ? 'freshness-stale' : 'freshness-ok'}">${stale ? '⚠️ 数据可能过期' : '🟢'}&nbsp;数据更新于: ${escapeHtml(timeStr)}</div>`;
 }
 
 async function renderAgents() {
@@ -149,8 +164,17 @@ function parseProject(projectId) {
   return match ? { baseName: match[1], versionLabel: match[2].toUpperCase(), rawName: raw } : { baseName: raw, versionLabel: '主线', rawName: raw };
 }
 
+const ACTIVE_STAGES = new Set(['developing', 'testing', 'planned', 'draft']);
+const BLOCKED_STAGES = new Set(['blocked']);
+
 function isArchivedStage(stage) {
   return ['done', 'archived', 'cancelled'].includes(String(stage || '').toLowerCase());
+}
+
+function groupPriority(group) {
+  if (group.versions.some(v => ACTIVE_STAGES.has(String(v.current_stage || '').toLowerCase()))) return 0;
+  if (group.versions.some(v => BLOCKED_STAGES.has(String(v.current_stage || '').toLowerCase()))) return 1;
+  return 2;
 }
 
 function groupProjects(projects) {
@@ -170,20 +194,32 @@ function groupProjects(projects) {
     });
     const active = versions.find((item) => !isArchivedStage(item.current_stage)) || versions[0];
     return { baseName, versions, active };
-  }).sort((a, b) => new Date(b.active?.updated_at || 0) - new Date(a.active?.updated_at || 0));
+  }).sort((a, b) => {
+    const pa = groupPriority(a), pb = groupPriority(b);
+    if (pa !== pb) return pa - pb;
+    return new Date(b.active?.updated_at || 0) - new Date(a.active?.updated_at || 0);
+  });
 }
 
 async function renderProjects() {
   const projects = await fetchJSON(API + '/api/projects');
   const grouped = groupProjects(projects);
-  document.getElementById('projects').innerHTML = grouped.map((group) => `
-    <details class="project-group" open>
+  document.getElementById('projects').innerHTML = grouped.map((group) => {
+    const priority = groupPriority(group);
+    const isDoneGroup = priority === 2;
+    const openAttr = isDoneGroup ? '' : 'open';
+    const doneCount = group.versions.filter(v => isArchivedStage(v.current_stage)).length;
+    const summaryRight = isDoneGroup
+      ? `<span class="group-done-badge">${doneCount} 已完成版本</span>`
+      : `<a class="project-link" href="/team/projects">查看详情 →</a>`;
+    return `
+    <details class="project-group" ${openAttr}>
       <summary>
         <div class="group-main">
           <div class="group-name">${escapeHtml(group.baseName)}</div>
           <div class="group-meta">共 ${group.versions.length} 个版本，活跃版本 ${escapeHtml(group.active?.versionLabel || '—')}</div>
         </div>
-        <a class="project-link" href="/team/projects">查看详情 →</a>
+        ${summaryRight}
       </summary>
       <div class="versions">
         ${group.versions.map((p) => `
@@ -200,7 +236,8 @@ async function renderProjects() {
         `).join('')}
       </div>
     </details>
-  `).join('') || '<div style="color:#94a3b8">暂无项目数据</div>';
+    `;
+  }).join('') || '<div style="color:#94a3b8">暂无项目数据</div>';
 }
 
 async function refresh() {

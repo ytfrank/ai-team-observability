@@ -234,7 +234,7 @@ class APIServerBackendTest(unittest.TestCase):
         page = Path('web/static/alerts.html').read_text(encoding='utf-8')
         self.assertIn('告警中心', page)
         self.assertIn('/api/alerts?limit=100', page)
-        self.assertIn('alert-table-body', page)
+        self.assertIn('alert-list', page)
 
     def test_agents_page_contains_detail_sections(self):
         page = Path('web/static/agents.html').read_text(encoding='utf-8')

@@ -11,41 +11,57 @@ nav { background: #1e293b; padding: 12px 24px; display: flex; align-items: cente
 nav .logo { font-size: 18px; font-weight: 700; color: #38bdf8; }
 nav a { color: #94a3b8; text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
 nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
-.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.container { max-width: 1380px; margin: 0 auto; padding: 24px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
 .page-header h1 { font-size: 30px; }
 .page-header p { color: #94a3b8; margin-top: 8px; }
 .refresh-info { font-size: 12px; color: #64748b; }
-.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+/* Stats bar */
+.stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
 .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; }
 .stat-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
 .stat-value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+/* Layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
 .panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
-.panel-header { padding: 18px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.panel-title { font-size: 18px; font-weight: 700; }
-.panel-subtitle { color: #94a3b8; font-size: 13px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 14px 20px; text-align: left; border-bottom: 1px solid #334155; vertical-align: top; }
-th { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
-td { font-size: 14px; color: #e2e8f0; }
-tr:last-child td { border-bottom: none; }
-.severity-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.panel-header { padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+.panel-title { font-size: 17px; font-weight: 700; }
+.panel-subtitle { color: #94a3b8; font-size: 12px; margin-top: 3px; }
+/* Alert list */
+.alert-list { display: grid; }
+.alert-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #334155; cursor: pointer; transition: background .12s; }
+.alert-row:last-child { border-bottom: none; }
+.alert-row:hover { background: rgba(56,189,248,.05); }
+.alert-row.selected { background: rgba(56,189,248,.1); border-left: 3px solid #38bdf8; }
+.alert-time { font-size: 12px; color: #64748b; white-space: nowrap; }
+.alert-msg { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-sub { font-size: 12px; color: #94a3b8; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-status { font-size: 12px; color: #64748b; white-space: nowrap; }
+/* Severity badges */
+.severity-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
 .severity-critical { background: #7f1d1d; color: #fecaca; }
 .severity-warning { background: #78350f; color: #fde68a; }
 .severity-info { background: #1e3a5f; color: #bfdbfe; }
-.status-text { color: #94a3b8; font-size: 13px; }
-.message { font-weight: 600; margin-bottom: 4px; }
-.meta { color: #94a3b8; font-size: 12px; }
-.empty-state, .error-state { padding: 40px 20px; text-align: center; color: #94a3b8; }
+/* Detail panel */
+.detail-panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; position: sticky; top: 20px; }
+.detail-empty { padding: 48px 20px; text-align: center; color: #475569; }
+.detail-body { padding: 20px; display: grid; gap: 14px; }
+.detail-field { display: grid; gap: 4px; }
+.detail-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .07em; }
+.detail-value { font-size: 14px; color: #e2e8f0; word-break: break-word; }
+.ack-btn { width: 100%; padding: 10px; background: #0f172a; border: 1px solid #475569; border-radius: 10px; color: #e2e8f0; font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s; }
+.ack-btn:hover:not(:disabled) { border-color: #38bdf8; color: #38bdf8; }
+.ack-btn:disabled { opacity: .5; cursor: default; }
+.ack-done { color: #6ee7b7; border-color: #065f46; }
+/* Empty / error */
+.empty-state, .error-state { padding: 48px 20px; text-align: center; color: #94a3b8; }
 .error-state { color: #fca5a5; }
-@media (max-width: 900px) {
-  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; }
+  .detail-panel { position: static; }
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
   .page-header { flex-direction: column; align-items: flex-start; }
-  table, thead, tbody, th, td, tr { display: block; }
-  thead { display: none; }
-  tr { border-bottom: 1px solid #334155; }
-  td { border-bottom: none; padding-top: 8px; padding-bottom: 8px; }
-  td::before { content: attr(data-label); display: block; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .alert-row { grid-template-columns: auto 1fr auto; }
 }
 </style>
 </head>
@@ -67,70 +83,47 @@ tr:last-child td { border-bottom: none; }
     <div class="refresh-info" id="refresh-info">正在加载…</div>
   </div>
 
-  <div class="stats-grid" id="stats">
-    <div class="stat-card"><div class="stat-label">最近告警</div><div class="stat-value">-</div></div>
-    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value">-</div></div>
-    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value">-</div></div>
-    <div class="stat-card"><div class="stat-label">待处理</div><div class="stat-value">-</div></div>
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-card"><div class="stat-label">告警总数</div><div class="stat-value">—</div></div>
+    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value">—</div></div>
+    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value">—</div></div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header">
-      <div>
-        <div class="panel-title">最近 100 条告警</div>
-        <div class="panel-subtitle">按告警时间倒序，支持空状态展示。</div>
+  <div class="layout">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">最近 100 条告警</div>
+          <div class="panel-subtitle">按告警时间倒序 · 点击条目查看详情</div>
+        </div>
+      </div>
+      <div class="alert-list" id="alert-list">
+        <div class="empty-state">正在加载告警数据…</div>
       </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>时间</th>
-          <th>级别</th>
-          <th>类型</th>
-          <th>对象</th>
-          <th>内容</th>
-          <th>状态</th>
-        </tr>
-      </thead>
-      <tbody id="alert-table-body">
-        <tr><td colspan="6" class="empty-state">正在加载告警数据…</td></tr>
-      </tbody>
-    </table>
+
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-empty">← 选择一条告警查看详情</div>
+    </div>
   </div>
 </div>
 
 <script>
 const API = '';
+let allAlerts = [];
+let selectedId = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[char]));
 }
 
 function formatTime(value) {
   if (!value) return '—';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString('zh-CN', { hour12: false });
-}
-
-function renderStats(alerts) {
-  const critical = alerts.filter((item) => item.severity === 'critical').length;
-  const warning = alerts.filter((item) => item.severity === 'warning').length;
-  const openCount = alerts.filter((item) => !item.resolved_at).length;
-  const latest = alerts[0]?.alert_time ? formatTime(alerts[0].alert_time) : '暂无';
-
-  document.getElementById('stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">最近告警</div><div class="stat-value">${escapeHtml(latest)}</div></div>
-    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value" style="color:#fca5a5">${critical}</div></div>
-    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value" style="color:#fde68a">${warning}</div></div>
-    <div class="stat-card"><div class="stat-label">待处理</div><div class="stat-value" style="color:#93c5fd">${openCount}</div></div>
-  `;
 }
 
 function severityClass(severity) {
@@ -139,42 +132,128 @@ function severityClass(severity) {
   return 'severity-info';
 }
 
-function renderAlerts(alerts) {
-  const tableBody = document.getElementById('alert-table-body');
+function renderStatsBar(alerts) {
+  const total = alerts.length;
+  const critical = alerts.filter(a => a.severity === 'critical').length;
+  const warning = alerts.filter(a => a.severity === 'warning').length;
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat-card"><div class="stat-label">告警总数</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value" style="color:#fca5a5">${critical}</div></div>
+    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value" style="color:#fde68a">${warning}</div></div>
+  `;
+}
+
+function renderAlertList(alerts) {
+  const list = document.getElementById('alert-list');
   if (!alerts.length) {
-    tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">最近没有告警，系统当前处于安静状态。</td></tr>';
+    list.innerHTML = '<div class="empty-state">最近没有告警，系统当前处于安静状态。</div>';
     return;
   }
-
-  tableBody.innerHTML = alerts.map((alert) => {
-    const target = [alert.project_id, alert.agent_name].filter(Boolean).join(' / ') || '全局';
-    const status = alert.resolved_at ? `已恢复 ${escapeHtml(formatTime(alert.resolved_at))}` : (alert.acknowledged ? '已确认，待恢复' : '未确认');
+  list.innerHTML = alerts.map(alert => {
+    const target = [alert.agent_name, alert.project_id].filter(Boolean).join(' / ') || '全局';
+    const isAcked = alert.acknowledged || alert.resolved_at;
+    const statusLabel = alert.resolved_at ? '已恢复' : (alert.acknowledged ? '已确认' : '待处理');
     return `
-      <tr>
-        <td data-label="时间">${escapeHtml(formatTime(alert.alert_time))}</td>
-        <td data-label="级别"><span class="severity-pill ${severityClass(alert.severity)}">${escapeHtml(alert.severity)}</span></td>
-        <td data-label="类型">${escapeHtml(alert.alert_type || '—')}</td>
-        <td data-label="对象">${escapeHtml(target)}</td>
-        <td data-label="内容">
-          <div class="message">${escapeHtml(alert.message || '无附加说明')}</div>
-          <div class="meta">alert_id: ${escapeHtml(alert.alert_id)}</div>
-        </td>
-        <td data-label="状态"><span class="status-text">${escapeHtml(status)}</span></td>
-      </tr>
+      <div class="alert-row${alert.alert_id === selectedId ? ' selected' : ''}" data-id="${escapeHtml(alert.alert_id)}">
+        <span class="severity-pill ${severityClass(alert.severity)}">${escapeHtml(alert.severity)}</span>
+        <div style="min-width:0">
+          <div class="alert-msg">${escapeHtml(alert.message || alert.alert_type || '无说明')}</div>
+          <div class="alert-sub">${escapeHtml(target)} · ${escapeHtml(formatTime(alert.alert_time))}</div>
+        </div>
+        <div class="alert-status">${escapeHtml(statusLabel)}</div>
+      </div>
     `;
   }).join('');
+
+  list.querySelectorAll('.alert-row[data-id]').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.id;
+      selectedId = id;
+      const alert = allAlerts.find(a => String(a.alert_id) === String(id));
+      if (alert) showDetail(alert);
+      list.querySelectorAll('.alert-row').forEach(r => r.classList.toggle('selected', r.dataset.id === id));
+    });
+  });
+}
+
+function showDetail(alert) {
+  const panel = document.getElementById('detail-panel');
+  const isAcked = !!(alert.acknowledged || alert.resolved_at);
+  const target = [alert.agent_name, alert.project_id].filter(Boolean).join(' / ') || '全局';
+  panel.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">告警详情</div>
+        <div class="panel-subtitle">ID: ${escapeHtml(alert.alert_id)}</div>
+      </div>
+      <span class="severity-pill ${severityClass(alert.severity)}">${escapeHtml(alert.severity)}</span>
+    </div>
+    <div class="detail-body">
+      <div class="detail-field">
+        <div class="detail-label">告警类型</div>
+        <div class="detail-value">${escapeHtml(alert.alert_type || '—')}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">消息内容</div>
+        <div class="detail-value" style="font-weight:600">${escapeHtml(alert.message || '—')}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">Agent</div>
+        <div class="detail-value">${escapeHtml(alert.agent_name || '—')}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">项目</div>
+        <div class="detail-value">${escapeHtml(alert.project_id || '—')}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">告警时间</div>
+        <div class="detail-value">${escapeHtml(formatTime(alert.alert_time))}</div>
+      </div>
+      <div class="detail-field">
+        <div class="detail-label">状态</div>
+        <div class="detail-value">${alert.resolved_at ? `已恢复 · ${escapeHtml(formatTime(alert.resolved_at))}` : (alert.acknowledged ? '已确认，待恢复' : '未确认')}</div>
+      </div>
+      <button class="ack-btn${isAcked ? ' ack-done' : ''}" id="ack-btn" data-id="${escapeHtml(alert.alert_id)}" ${isAcked ? 'disabled' : ''}>
+        ${isAcked ? '✓ 已确认' : '标记为已确认'}
+      </button>
+    </div>
+  `;
+
+  document.getElementById('ack-btn')?.addEventListener('click', async function () {
+    const btn = this;
+    const alertId = btn.dataset.id;
+    btn.disabled = true;
+    btn.textContent = '确认中…';
+    try {
+      const resp = await fetch(`${API}/api/alerts/${encodeURIComponent(alertId)}/ack`, { method: 'PUT' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      btn.textContent = '✓ 已确认';
+      btn.classList.add('ack-done');
+      const a = allAlerts.find(x => String(x.alert_id) === String(alertId));
+      if (a) { a.acknowledged = true; renderAlertList(allAlerts); }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '确认失败，请重试';
+      console.error('Ack failed:', err);
+    }
+  });
 }
 
 async function refresh() {
   const refreshInfo = document.getElementById('refresh-info');
   try {
     const response = await fetch(API + '/api/alerts?limit=100');
-    const alerts = await response.json();
-    renderStats(alerts);
-    renderAlerts(alerts);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    allAlerts = await response.json();
+    renderStatsBar(allAlerts);
+    renderAlertList(allAlerts);
+    if (selectedId) {
+      const still = allAlerts.find(a => String(a.alert_id) === String(selectedId));
+      if (still) showDetail(still);
+    }
     refreshInfo.textContent = `最近刷新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
   } catch (error) {
-    document.getElementById('alert-table-body').innerHTML = '<tr><td colspan="6" class="error-state">告警数据加载失败，请检查 API 服务。</td></tr>';
+    document.getElementById('alert-list').innerHTML = '<div class="error-state">告警数据加载失败，请检查 API 服务。</div>';
     refreshInfo.textContent = '刷新失败';
     console.error('Alert refresh failed:', error);
   }

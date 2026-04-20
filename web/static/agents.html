@@ -40,11 +40,21 @@ nav a.active, nav a:hover { color: #fff; background: #334155; }
 .metric-label { color: #94a3b8; font-size: 12px; }
 .metric-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
 .timeline, .heatmap, .record-list { display: grid; gap: 10px; }
-.timeline-item, .record-item { border: 1px solid #334155; border-radius: 14px; padding: 14px; background: rgba(15, 23, 42, .45); }
+.timeline-item, .record-item { border: 1px solid #334155; border-radius: 14px; padding: 14px; background: rgba(15, 23, 42, .45); cursor: pointer; transition: border-color .15s; }
+.timeline-item:hover { border-color: #475569; }
+.tl-head { display: flex; align-items: center; gap: 10px; }
+.tl-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; font-size: 13px; flex-shrink: 0; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tl-badges { margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tl-kind-badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .timeline-head, .record-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .timeline-title, .record-title { font-weight: 700; }
 .timeline-meta, .record-meta { font-size: 12px; color: #94a3b8; }
-.timeline-detail, .record-detail { font-size: 13px; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap; }
+.timeline-detail, .record-detail { font-size: 13px; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap; display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #334155; }
+.timeline-item.expanded .timeline-detail { display: block; }
+.expand-hint { font-size: 11px; color: #475569; margin-left: auto; flex-shrink: 0; }
+.current-stage-banner { background: #1e3a5f; border: 1px solid #3b82f6; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; color: #93c5fd; font-weight: 600; font-size: 14px; }
 .section-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(24, minmax(12px, 1fr)); gap: 4px; }
 .heat-cell { aspect-ratio: 1 / 1; border-radius: 4px; background: rgba(148, 163, 184, .14); position: relative; }
@@ -139,6 +149,22 @@ async function fetchJSON(url) {
   return resp.json();
 }
 
+const KIND_CONFIG = {
+  stage_enter:     { icon: '▶', color: '#6ee7b7', bg: 'rgba(16,185,129,.2)',  label: '阶段进入' },
+  stage_exit:      { icon: '⏹', color: '#93c5fd', bg: 'rgba(59,130,246,.2)',  label: '阶段退出' },
+  artifact_commit: { icon: '📦', color: '#c4b5fd', bg: 'rgba(139,92,246,.2)', label: '成果物提交' },
+  subagent_spawn:  { icon: '⚡', color: '#fdba74', bg: 'rgba(249,115,22,.2)', label: 'Sub-agent' },
+  a2a_send:        { icon: '📤', color: '#67e8f9', bg: 'rgba(6,182,212,.2)',  label: 'A2A发送' },
+  a2a_receive:     { icon: '📥', color: '#67e8f9', bg: 'rgba(6,182,212,.2)',  label: 'A2A接收' },
+  error:           { icon: '✕',  color: '#fca5a5', bg: 'rgba(239,68,68,.2)',  label: '错误' },
+  warning:         { icon: '⚠',  color: '#fde68a', bg: 'rgba(234,179,8,.2)', label: '警告' },
+};
+const KIND_DEFAULT = { icon: '●', color: '#94a3b8', bg: 'rgba(148,163,184,.15)', label: '' };
+
+function kindCfg(kind) {
+  return KIND_CONFIG[kind] || { ...KIND_DEFAULT, label: kind || 'event' };
+}
+
 function colorForCount(count, max) {
   if (!count) return 'rgba(148,163,184,.12)';
   const ratio = Math.max(.12, count / Math.max(1, max));
@@ -219,11 +245,47 @@ function renderRecords(items, emptyText) {
   `).join('')}</div>`;
 }
 
+function renderTimeline(items) {
+  if (!items || !items.length) return '<div class="empty">当前时间范围内没有时间线事件。</div>';
+  return items.slice(0, 50).map((item, idx) => {
+    const k = kindCfg(item.kind);
+    return `
+      <div class="timeline-item" data-tl="${idx}" style="border-color:${k.color}33">
+        <div class="tl-head">
+          <div class="tl-icon" style="background:${k.bg};color:${k.color}">${k.icon}</div>
+          <div class="tl-body">
+            <div class="tl-top">
+              <div class="timeline-title">${escapeHtml(item.title)}</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="timeline-meta" style="white-space:nowrap">${timeText(item.time)}</div>
+                <span class="expand-hint">▾</span>
+              </div>
+            </div>
+            <div class="tl-badges">
+              <span class="tl-kind-badge" style="background:${k.bg};color:${k.color}">${escapeHtml(k.label)}</span>
+              ${item.project_id ? `<span class="timeline-meta">项目: ${escapeHtml(item.project_id)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="timeline-detail">${escapeHtml(item.detail || '无更多细节')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function loadAgentDetail(agentName) {
   const detail = await fetchJSON(`${API}/api/agent_detail?agent=${encodeURIComponent(agentName)}&range=${encodeURIComponent(state.range)}`);
   document.getElementById('detail-title').textContent = `${agentName} 详情`;
   document.getElementById('detail-subtitle').textContent = `范围: ${detail.range.key}，最新活动 ${timeAgo(detail.summary.latest_event_time)}`;
+
+  const agentInfo = state.agents.find(a => a.agent_name === agentName);
+  const currentStage = agentInfo?.current_stage || null;
+  const stageBanner = currentStage
+    ? `<div class="current-stage-banner">📍 当前阶段: ${escapeHtml(currentStage)}</div>`
+    : '';
+
   document.getElementById('detail-area').innerHTML = `
+    ${stageBanner}
     <section>
       <div class="hero">
         <div class="metric"><div class="metric-label">总事件</div><div class="metric-value">${detail.summary.total_events}</div></div>
@@ -239,17 +301,8 @@ async function loadAgentDetail(agentName) {
     </section>
 
     <section>
-      <div class="section-title">活动时间线</div>
-      <div class="timeline">${(detail.timeline || []).slice(0, 30).map(item => `
-        <div class="timeline-item">
-          <div class="timeline-head">
-            <div class="timeline-title">${escapeHtml(item.title)}</div>
-            <div class="timeline-meta">${timeText(item.time)}</div>
-          </div>
-          <div class="timeline-meta">类型: ${escapeHtml(item.kind)}${item.project_id ? ` · 项目 ${escapeHtml(item.project_id)}` : ''}</div>
-          <div class="timeline-detail">${escapeHtml(item.detail || '无更多细节')}</div>
-        </div>
-      `).join('') || '<div class="empty">当前时间范围内没有时间线事件。</div>'}</div>
+      <div class="section-title">活动时间线 <span style="font-size:12px;color:#94a3b8;font-weight:400">（点击条目展开详情）</span></div>
+      <div class="timeline" id="tl-container">${renderTimeline(detail.timeline)}</div>
     </section>
 
     <section>
@@ -264,12 +317,22 @@ async function loadAgentDetail(agentName) {
 
     <section id="recent-events">
       <div class="section-title">相关入口</div>
-      <div class="timeline-item">
-        <div class="timeline-title"><a class="anchor" href="/team/projects">查看项目流转</a></div>
-        <div class="timeline-detail">需要顺着项目继续排查时，从这里跳转到项目流转页或成果物页。</div>
+      <div class="timeline-item" style="cursor:default">
+        <div class="tl-head">
+          <div class="tl-body"><div class="timeline-title"><a class="anchor" href="/team/projects">查看项目流转 →</a></div>
+          <div class="timeline-meta" style="margin-top:4px">需要顺着项目排查时，跳转到项目流转页或成果物页。</div></div>
+        </div>
       </div>
     </section>
   `;
+
+  document.getElementById('tl-container')?.querySelectorAll('.timeline-item[data-tl]').forEach(el => {
+    el.addEventListener('click', () => {
+      el.classList.toggle('expanded');
+      const hint = el.querySelector('.expand-hint');
+      if (hint) hint.textContent = el.classList.contains('expanded') ? '▴' : '▾';
+    });
+  });
 }
 
 async function refresh() {

@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS event_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_event_time ON event_log(event_time);
+CREATE INDEX IF NOT EXISTS idx_event_time_desc ON event_log(event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_agent ON event_log(agent_name, event_time);
+CREATE INDEX IF NOT EXISTS idx_agent_time_desc ON event_log(agent_name, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_project ON event_log(project_id, event_time);
 
 CREATE TABLE IF NOT EXISTS agg_agent_status (
@@ -270,15 +272,33 @@ def scan_sessions(conn, last_run):
                         inp = usage.get('input', 0) or usage.get('prompt_tokens', 0) or 0
                         out = usage.get('output', 0) or usage.get('completion_tokens', 0) or 0
 
+                        # Enhanced event classification from summary + payload text
+                        payload_text = json.dumps(entry, ensure_ascii=False)[:500]
+                        combined_text = (summary + ' ' + payload_text).lower()
+
+                        event_category = 'llm' if model else 'lifecycle'
+                        event_severity = 'info'
+
+                        if 'sessions_spawn' in combined_text or 'subagent' in combined_text:
+                            event_category = 'subagent'
+                        elif 'sessions_send' in combined_text or 'a2a' in combined_text:
+                            event_category = 'a2a'
+                        elif ('stage_enter' in combined_text or 'stage_exit' in combined_text
+                              or 'developing' in combined_text or 'testing' in combined_text):
+                            event_category = 'milestone'
+
+                        if 'error' in combined_text or 'failed' in combined_text:
+                            event_severity = 'error'
+
                         events.append({
                             'event_id': eid,
                             'event_time': ts if isinstance(ts, str) else str(ts),
                             'source_type': 'session_file',
                             'agent_name': agent_name,
                             'project_id': entry.get('project_id'),
-                            'event_category': 'llm' if model else 'lifecycle',
+                            'event_category': event_category,
                             'event_type': entry_type or role,
-                            'severity': 'info',
+                            'severity': event_severity,
                             'provider': provider,
                             'model': model,
                             'input_tokens': inp,
@@ -394,6 +414,87 @@ def write_events(conn, events):
     conn.commit()
     return written
 
+# ── Alert Rule Engine ───────────────────────────────────
+
+def run_alert_checks(conn):
+    """Evaluate alert rules and insert new alerts (INSERT OR IGNORE to avoid duplicates)."""
+    now = datetime.now(CST)
+    now_iso = now.isoformat(timespec='seconds')
+
+    def parse_dt(value):
+        if not value:
+            return None
+        try:
+            text = str(value).replace('Z', '+00:00')
+            dt = datetime.fromisoformat(text)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=CST)
+            return dt
+        except Exception:
+            return None
+
+    def insert_alert(alert_id, rule_type, severity, agent_name=None, project_id=None, message=''):
+        conn.execute("""
+            INSERT OR IGNORE INTO alerts
+            (alert_id, alert_time, alert_type, severity, agent_name, project_id, message, acknowledged)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        """, (alert_id, now_iso, rule_type, severity, agent_name, project_id, message))
+
+    # Rule 1: agent_stalled — running agent with no action for > 30 min
+    agents = conn.execute(
+        "SELECT agent_name, last_action_time FROM agg_agent_status WHERE status='running'"
+    ).fetchall()
+    for row in agents:
+        agent_name, last_action_time = row[0], row[1]
+        dt = parse_dt(last_action_time)
+        if dt and (now - dt) > timedelta(minutes=30):
+            aid = event_id('agent_stalled', agent_name)
+            insert_alert(aid, 'agent_stalled', 'warning', agent_name=agent_name,
+                         message=f"Agent {agent_name} has been stalled for over 30 minutes")
+
+    # Rules 2-4: project overtime thresholds
+    projects = conn.execute("""
+        SELECT project_id, current_stage, stage_enter_time FROM agg_project_flow
+        WHERE current_stage NOT IN ('done', 'deployed', 'archived', 'cancelled')
+    """).fetchall()
+    for row in projects:
+        project_id, current_stage, stage_enter_time = row[0], row[1], row[2]
+        dt = parse_dt(stage_enter_time)
+        if not dt:
+            continue
+        elapsed = now - dt
+        if elapsed > timedelta(hours=48):
+            aid = event_id('project_overtime_48h', project_id)
+            insert_alert(aid, 'project_overtime_48h', 'critical', project_id=project_id,
+                         message=f"Project {project_id} stuck in stage '{current_stage}' for over 48 hours")
+        elif elapsed > timedelta(hours=24):
+            aid = event_id('project_overtime_24h', project_id)
+            insert_alert(aid, 'project_overtime_24h', 'critical', project_id=project_id,
+                         message=f"Project {project_id} stuck in stage '{current_stage}' for over 24 hours")
+        elif elapsed > timedelta(hours=12):
+            aid = event_id('project_overtime_12h', project_id)
+            insert_alert(aid, 'project_overtime_12h', 'warning', project_id=project_id,
+                         message=f"Project {project_id} stuck in stage '{current_stage}' for over 12 hours")
+
+    # Rule 5: consecutive_stalled — blocked project with no update for > 1 hour
+    blocked = conn.execute("""
+        SELECT project_id, block_reason, updated_at FROM agg_project_flow
+        WHERE block_reason IS NOT NULL AND block_reason != ''
+    """).fetchall()
+    for row in blocked:
+        project_id, block_reason, updated_at = row[0], row[1], row[2]
+        dt = parse_dt(updated_at)
+        if dt and (now - dt) > timedelta(hours=1):
+            aid = event_id('consecutive_stalled', project_id)
+            insert_alert(aid, 'consecutive_stalled', 'critical', project_id=project_id,
+                         message=f"Project {project_id} stalled with same block reason for over 1 hour: {block_reason[:100]}")
+
+    # Record alert run timestamp
+    conn.execute("INSERT OR REPLACE INTO collector_state (key, value) VALUES ('last_alert_run', ?)",
+                 (now_iso,))
+    conn.commit()
+
+
 # ── Main ────────────────────────────────────────────────
 
 def run_once(conn):
@@ -415,6 +516,9 @@ def run_once(conn):
     conn.execute("INSERT OR REPLACE INTO collector_state (key, value) VALUES ('last_run', ?)",
                  (str(time.time()),))
     conn.commit()
+
+    # Run alert rule engine
+    run_alert_checks(conn)
 
     elapsed = time.time() - t0
     print(f"[{now_cst()}] Collected: {event_count} events, {len(projects)} projects in {elapsed:.1f}s")
