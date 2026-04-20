@@ -1,0 +1,165 @@
+{
+  "project": "ai-team-observability",
+  "version": 7,
+  "lifecycle": "active",
+  "created_at": "2026-04-15T10:15:00+08:00",
+  "workflow": {
+    "current_stage": "developing",
+    "stage_history": [
+      {
+        "stage": "draft",
+        "entered_at": "2026-04-15T10:15:00+08:00",
+        "exited_at": "2026-04-15T10:15:00+08:00",
+        "note": "小叮当编写V3需求文档（基于V2测试FAIL结果）"
+      },
+      {
+        "stage": "planned",
+        "entered_at": "2026-04-15T10:15:00+08:00",
+        "exited_at": "2026-04-15T08:23:00+08:00",
+        "note": "波哥确认V3需求"
+      }
+    ],
+    "stage_owner": "doraemon",
+    "stage_status": "active",
+    "stage_entered_at": "2026-04-17T08:05:00+08:00",
+    "exception_state": "rescue_triggered",
+    "exception_since": "2026-04-20T08:05:00+08:00",
+    "exception_note": "PMO rescue: Peter连续55h+无新commit，波哥指示小叮当接手开发。",
+    "history": [
+      {
+        "time": "2026-04-17T08:05:00+08:00",
+        "event": "lifecycle restored to active by 小叮当 per 波哥指示",
+        "stage": "cancelled->developing"
+      },
+      {
+        "time": "2026-04-17T09:53:00+08:00",
+        "event": "Peter A2A反馈：流程执行异常（方案未执行+主线程擅自动手+SUBMISSION骨架误导+状态失真+缺sub-agent留痕）。小叮当承认PMO操作问题。等待策略校正。",
+        "stage": "developing"
+      },
+      {
+        "time": "2026-04-18T00:42:00+08:00",
+        "event": "小叮当review: Peter新commit 8eead33 (1000行变更)，异常状态清除，A2A催详细进展+SUBMISSION",
+        "stage": "developing"
+      },
+      {
+        "time": "2026-04-20T08:05:00+08:00",
+        "event": "PMO rescue triggered: 小叮当接手V3开发，Peter交接。决策：继续开发不重做，基于现有代码完成P0-3+P1。",
+        "stage": "developing"
+      }
+    ]
+  },
+  "official": {
+    "updated_at": "2026-04-18T00:42:00+08:00",
+    "updated_by": "doraemon",
+    "summary": "Peter恢复产出，commit 8eead33 (2026-04-18 00:03) 包含P0数据隔离+collector修复+项目页版本分组，1000行变更。已A2A催促提交详细进展报告和SUBMISSION.md。",
+    "blocking": null,
+    "risks": [
+      "图表渲染性能（Chart.js/ECharts）",
+      "成果物预览需处理多种文件类型"
+    ],
+    "decisions": [
+      "基于V2代码迭代，不重写",
+      "纯Python+SQLite+Vanilla JS + Chart.js/ECharts CDN",
+      "Collector必须正确识别项目版本，数据不混淆",
+      "项目结构修正：V1使用monitor/v1/，V2使用monitor/v2/，V3使用monitor/v3/"
+    ],
+    "next_action": "等待Peter回复详细进展 → P0完成后提测",
+    "decision": "restored_by_bibo_order"
+  },
+  "runtime": {
+    "last_runtime_update_at": "2026-04-18T00:46:00+08:00",
+    "last_runtime_update_by": "peter",
+    "active_role": "peter",
+    "active_tasks": [
+      "P0-1: Collector版本隔离与数据准确性（已完成）",
+      "P0-2: 项目列表版本分组（已完成）",
+      "P0-3: 成果物预览与下载（联调收口中）",
+      "P1: Agent事件图表化 / Token趋势图 / 告警中心（告警中心已完成，其余待完成）"
+    ],
+    "latest_evidence_refs": [
+      "commit:8eead33 feat(v3): P0 data isolation + collector fix + projects page version grouping",
+      "artifact:monitor/v3/dev/TECH_PLAN.md",
+      "artifact:monitor/v3/dev/STAGE_SUMMARY.md",
+      "artifact:monitor/v3/dev/SUBMISSION.md",
+      "test:python3 -m unittest -q tests/test_api_server.py"
+    ],
+    "waiting_on": null,
+    "recent_actions": [
+      "完成 commit 8eead33：collector 版本隔离、/api/projects 分组元数据、项目页版本分组与成果物面板主框架",
+      "更新 TECH_PLAN，明确本轮按主线程收口执行，不变更 V3 技术方案",
+      "补写 SUBMISSION.md，记录当前已完成项、进行中项和自测状态",
+      "完成接口级自测：python3 -m unittest -q tests/test_api_server.py 通过",
+      "继续收口 P0-3 成果物预览/下载细节与剩余 V3 功能联调"
+    ],
+    "latest_commit": "8eead33b8ae04c4b282ffeefc3c2c2d4228e0008"
+  },
+  "roles": {
+    "product_owner": "doraemon",
+    "developer": "peter",
+    "qa": "guard",
+    "ops": "atlas"
+  },
+  "artifacts": {
+    "requirements": {
+      "path": "monitor/v3/requirements/REQUIREMENTS.md",
+      "status": "confirmed",
+      "owner": "doraemon",
+      "updated_at": "2026-04-15T08:23:00+08:00"
+    },
+    "tech_plan": {
+      "path": "monitor/v3/dev/TECH_PLAN.md",
+      "status": "pending",
+      "owner": "peter"
+    },
+    "submission": {
+      "path": "monitor/v3/dev/SUBMISSION.md",
+      "status": "pending",
+      "owner": "peter"
+    },
+    "qa_report": {
+      "path": "monitor/v3/qa/report.md",
+      "status": "pending",
+      "owner": "guard"
+    },
+    "acceptance": {
+      "path": "monitor/v3/acceptance/ACCEPTANCE.md",
+      "status": "pending",
+      "owner": "doraemon"
+    },
+    "deploy_report": {
+      "path": "monitor/v3/deploy/DEPLOY_REPORT.md",
+      "status": "pending",
+      "owner": "atlas"
+    }
+  },
+  "v2_baseline": {
+    "repo": "/Users/bibo/projects/ai-team-observability",
+    "domain": "monitor.doramax.cn",
+    "last_deploy": "2026-04-14",
+    "test_result": "FAIL (5 P0 + 2 P1 + 6 P2)"
+  },
+  "history": [
+    {
+      "time": "2026-04-16T13:42:00+08:00",
+      "actor": "波哥",
+      "action": "指示：撤销小叮当错误取消裁定，恢复项目active。规则：只有波哥能取消项目。"
+    },
+    {
+      "time": "2026-04-15T14:20:00+08:00",
+      "actor": "小叮当",
+      "action": "修正项目结构：main分支monitor/main/→monitor/v1/，v2分支monitor/main/→monitor/v2/，v3分支删除monitor/main/，确保每个版本只使用对应的monitor/{version}/目录"
+    },
+    {
+      "time": "2026-04-15T10:15:00+08:00",
+      "actor": "小叮当",
+      "action": "初始化V3项目：创建monitor/v3/目录和status.json"
+    },
+    {
+      "time": "2026-04-15T08:23:00+08:00",
+      "actor": "波哥",
+      "action": "确认V3需求"
+    }
+  ],
+  "handoffs": {},
+  "artifacts_base_path": "monitor/v3/"
+}

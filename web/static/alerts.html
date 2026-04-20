@@ -1,3 +1,187 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI团队指挥台</title>
-<style>body{background:#0f172a;color:#e2e8f0;font-family:system-ui;padding:40px;text-align:center}h1{margin-bottom:16px}a{color:#38bdf8}</style>
-</head><body><h1>🚧 页面建设中</h1><p>数据已通过API就绪，详情页开发中。</p><p><a href="/">← 返回总览</a></p></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI团队指挥台 - 告警中心</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f172a; color: #e2e8f0; }
+nav { background: #1e293b; padding: 12px 24px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #334155; }
+nav .logo { font-size: 18px; font-weight: 700; color: #38bdf8; }
+nav a { color: #94a3b8; text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
+nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+.page-header h1 { font-size: 30px; }
+.page-header p { color: #94a3b8; margin-top: 8px; }
+.refresh-info { font-size: 12px; color: #64748b; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; }
+.stat-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+.stat-value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+.panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
+.panel-header { padding: 18px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.panel-title { font-size: 18px; font-weight: 700; }
+.panel-subtitle { color: #94a3b8; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 14px 20px; text-align: left; border-bottom: 1px solid #334155; vertical-align: top; }
+th { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
+td { font-size: 14px; color: #e2e8f0; }
+tr:last-child td { border-bottom: none; }
+.severity-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.severity-critical { background: #7f1d1d; color: #fecaca; }
+.severity-warning { background: #78350f; color: #fde68a; }
+.severity-info { background: #1e3a5f; color: #bfdbfe; }
+.status-text { color: #94a3b8; font-size: 13px; }
+.message { font-weight: 600; margin-bottom: 4px; }
+.meta { color: #94a3b8; font-size: 12px; }
+.empty-state, .error-state { padding: 40px 20px; text-align: center; color: #94a3b8; }
+.error-state { color: #fca5a5; }
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-header { flex-direction: column; align-items: flex-start; }
+  table, thead, tbody, th, td, tr { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 1px solid #334155; }
+  td { border-bottom: none; padding-top: 8px; padding-bottom: 8px; }
+  td::before { content: attr(data-label); display: block; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">🧠 AI团队指挥台</div>
+  <a href="/">总览</a>
+  <a href="/team/agents">Agent作战</a>
+  <a href="/team/projects">项目流转</a>
+  <a href="/team/alerts" class="active">告警中心</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>告警中心</h1>
+      <p>展示最近告警、严重级别分布与处理状态。</p>
+    </div>
+    <div class="refresh-info" id="refresh-info">正在加载…</div>
+  </div>
+
+  <div class="stats-grid" id="stats">
+    <div class="stat-card"><div class="stat-label">最近告警</div><div class="stat-value">-</div></div>
+    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value">-</div></div>
+    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value">-</div></div>
+    <div class="stat-card"><div class="stat-label">待处理</div><div class="stat-value">-</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">最近 100 条告警</div>
+        <div class="panel-subtitle">按告警时间倒序，支持空状态展示。</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>时间</th>
+          <th>级别</th>
+          <th>类型</th>
+          <th>对象</th>
+          <th>内容</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody id="alert-table-body">
+        <tr><td colspan="6" class="empty-state">正在加载告警数据…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API = '';
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+}
+
+function formatTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function renderStats(alerts) {
+  const critical = alerts.filter((item) => item.severity === 'critical').length;
+  const warning = alerts.filter((item) => item.severity === 'warning').length;
+  const openCount = alerts.filter((item) => !item.resolved_at).length;
+  const latest = alerts[0]?.alert_time ? formatTime(alerts[0].alert_time) : '暂无';
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">最近告警</div><div class="stat-value">${escapeHtml(latest)}</div></div>
+    <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value" style="color:#fca5a5">${critical}</div></div>
+    <div class="stat-card"><div class="stat-label">Warning</div><div class="stat-value" style="color:#fde68a">${warning}</div></div>
+    <div class="stat-card"><div class="stat-label">待处理</div><div class="stat-value" style="color:#93c5fd">${openCount}</div></div>
+  `;
+}
+
+function severityClass(severity) {
+  if (severity === 'critical') return 'severity-critical';
+  if (severity === 'warning') return 'severity-warning';
+  return 'severity-info';
+}
+
+function renderAlerts(alerts) {
+  const tableBody = document.getElementById('alert-table-body');
+  if (!alerts.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="empty-state">最近没有告警，系统当前处于安静状态。</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = alerts.map((alert) => {
+    const target = [alert.project_id, alert.agent_name].filter(Boolean).join(' / ') || '全局';
+    const status = alert.resolved_at ? `已恢复 ${escapeHtml(formatTime(alert.resolved_at))}` : (alert.acknowledged ? '已确认，待恢复' : '未确认');
+    return `
+      <tr>
+        <td data-label="时间">${escapeHtml(formatTime(alert.alert_time))}</td>
+        <td data-label="级别"><span class="severity-pill ${severityClass(alert.severity)}">${escapeHtml(alert.severity)}</span></td>
+        <td data-label="类型">${escapeHtml(alert.alert_type || '—')}</td>
+        <td data-label="对象">${escapeHtml(target)}</td>
+        <td data-label="内容">
+          <div class="message">${escapeHtml(alert.message || '无附加说明')}</div>
+          <div class="meta">alert_id: ${escapeHtml(alert.alert_id)}</div>
+        </td>
+        <td data-label="状态"><span class="status-text">${escapeHtml(status)}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function refresh() {
+  const refreshInfo = document.getElementById('refresh-info');
+  try {
+    const response = await fetch(API + '/api/alerts?limit=100');
+    const alerts = await response.json();
+    renderStats(alerts);
+    renderAlerts(alerts);
+    refreshInfo.textContent = `最近刷新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+  } catch (error) {
+    document.getElementById('alert-table-body').innerHTML = '<tr><td colspan="6" class="error-state">告警数据加载失败，请检查 API 服务。</td></tr>';
+    refreshInfo.textContent = '刷新失败';
+    console.error('Alert refresh failed:', error);
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

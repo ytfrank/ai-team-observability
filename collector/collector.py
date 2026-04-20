@@ -69,6 +69,10 @@ CREATE TABLE IF NOT EXISTS agg_agent_status (
 
 CREATE TABLE IF NOT EXISTS agg_project_flow (
     project_id       TEXT PRIMARY KEY,
+    base_project     TEXT,
+    version          TEXT,
+    project_name     TEXT,
+    lifecycle        TEXT,
     current_stage    TEXT NOT NULL,
     stage_owner      TEXT,
     stage_enter_time TEXT,
@@ -77,6 +81,8 @@ CREATE TABLE IF NOT EXISTS agg_project_flow (
     latest_artifact  TEXT,
     block_reason     TEXT,
     stage_history    TEXT,
+    status_file      TEXT,
+    artifact_root    TEXT,
     updated_at       TEXT
 );
 
@@ -117,8 +123,83 @@ def init_db(db_path):
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.executescript(SCHEMA_SQL)
+    ensure_schema(conn)
     conn.commit()
     return conn
+
+def ensure_schema(conn):
+    """Best-effort lightweight migrations for SQLite tables."""
+    expected = {
+        'agg_project_flow': {
+            'base_project': 'TEXT',
+            'version': 'TEXT',
+            'project_name': 'TEXT',
+            'lifecycle': 'TEXT',
+            'status_file': 'TEXT',
+            'artifact_root': 'TEXT',
+        }
+    }
+    for table, columns in expected.items():
+        try:
+            existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        except Exception:
+            continue
+        for column, sql_type in columns.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+        conn.commit()
+
+
+def normalize_base_project(project_id, fallback_name):
+    value = project_id or fallback_name or ''
+    for marker in ('-v', '_v'):
+        idx = value.lower().rfind(marker)
+        if idx > 0:
+            suffix = value[idx + 2:]
+            if suffix and (suffix[0].isdigit() or suffix.startswith(('main', 'dev'))):
+                return value[:idx]
+    return value
+
+
+def parse_project_record(status_file):
+    data = json.loads(status_file.read_text())
+    repo_name = status_file.parent.parent.parent.name
+    version = status_file.parent.name
+    workflow = data.get('workflow', {})
+    runtime = data.get('runtime', {})
+    official = data.get('official', {})
+
+    raw_project_id = data.get('project_id') or data.get('project') or repo_name
+    project_id = raw_project_id if version in str(raw_project_id) else f"{repo_name}-{version}"
+    base_project = data.get('project') or normalize_base_project(raw_project_id, repo_name) or repo_name
+    current_stage = workflow.get('current_stage') or data.get('stage') or official.get('current_assessment') or 'unknown'
+    blockers = runtime.get('current_blockers') or official.get('blockers') or data.get('blockers') or []
+    block_reason = ', '.join(str(item) for item in blockers if item)
+    if current_stage in {'deployed', 'done'} and not blockers:
+        block_reason = ''
+
+    status_dir = status_file.parent
+    artifacts_base_path = data.get('artifacts_base_path')
+    artifact_root = (status_file.parent.parent.parent / artifacts_base_path).resolve() if artifacts_base_path else status_dir.resolve()
+
+    return {
+        'project_id': project_id,
+        'base_project': base_project,
+        'version': version,
+        'project_name': data.get('project_name') or data.get('project') or repo_name,
+        'lifecycle': data.get('lifecycle') or workflow.get('stage_status') or data.get('type'),
+        'current_stage': current_stage,
+        'stage_owner': workflow.get('stage_owner') or data.get('owner'),
+        'stage_enter_time': workflow.get('stage_entered_at') or workflow.get('stage_enter_time') or data.get('updated_at'),
+        'total_elapsed_min': 0,
+        'is_overtime': 0,
+        'latest_artifact': runtime.get('latest_commit') or runtime.get('latest_artifact_update'),
+        'block_reason': block_reason,
+        'stage_history': json.dumps(workflow.get('stage_history') or workflow.get('history') or data.get('history', []), ensure_ascii=False),
+        'status_file': str(status_file.resolve()),
+        'artifact_root': str(artifact_root),
+        'updated_at': official.get('updated_at') or runtime.get('last_runtime_update_at') or data.get('updated_at') or now_cst(),
+    }
 
 def event_id(*parts):
     """Generate deterministic event ID."""
@@ -217,48 +298,22 @@ def scan_status_json(conn):
     """Scan all project status.json files for project flow data."""
     projects = []
     for status_file in PROJECTS_HOME.glob('*/monitor/*/status.json'):
+        if '_templates' in status_file.parts:
+            continue
         try:
-            data = json.loads(status_file.read_text())
-            pid = data.get('project_id', status_file.parent.parent.parent.name)
-            wf = data.get('workflow', {})
-            rt = data.get('runtime', {})
-
-            # Compute progress_verified: True if evidence exists
-            evidence_refs = rt.get('latest_evidence_refs', [])
-            progress_verified = len(evidence_refs) > 0
-
-            # Extract last_real_output_time
-            last_real_output_time = rt.get('last_real_output_time') or rt.get('latest_artifact_update')
-
-            # Extract false_claim_flag
-            false_claim_flag = rt.get('false_claim_flag', False)
-
-            projects.append({
-                'project_id': pid,
-                'current_stage': wf.get('current_stage', 'unknown'),
-                'stage_owner': wf.get('stage_owner'),
-                'stage_enter_time': wf.get('stage_entered_at') or wf.get('stage_enter_time'),
-                'total_elapsed_min': 0,
-                'is_overtime': 0,
-                'latest_artifact': rt.get('latest_commit'),
-                'block_reason': ', '.join(rt.get('current_blockers', [])),
-                'stage_history': json.dumps(wf.get('stage_history', []), ensure_ascii=False),
-                'updated_at': now_cst(),
-                # New fields
-                'progress_verified': progress_verified,
-                'last_real_output_time': last_real_output_time,
-                'false_claim_flag': false_claim_flag,
-            })
+            projects.append(parse_project_record(status_file))
 
             # Upsert project flow
             conn.execute("""
                 INSERT OR REPLACE INTO agg_project_flow
-                (project_id, current_stage, stage_owner, stage_enter_time,
+                (project_id, base_project, version, project_name, lifecycle,
+                 current_stage, stage_owner, stage_enter_time,
                  total_elapsed_min, is_overtime, latest_artifact, block_reason,
-                 stage_history, updated_at)
-                VALUES (:project_id, :current_stage, :stage_owner, :stage_enter_time,
+                 stage_history, status_file, artifact_root, updated_at)
+                VALUES (:project_id, :base_project, :version, :project_name, :lifecycle,
+                        :current_stage, :stage_owner, :stage_enter_time,
                         :total_elapsed_min, :is_overtime, :latest_artifact, :block_reason,
-                        :stage_history, :updated_at)
+                        :stage_history, :status_file, :artifact_root, :updated_at)
             """, projects[-1])
 
         except Exception as e:
