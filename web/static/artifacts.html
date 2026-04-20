@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI团队指挥台 - 成果物</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+nav { background: #1e293b; padding: 12px 24px; display: flex; gap: 24px; border-bottom: 1px solid #334155; }
+nav .logo { color: #38bdf8; font-weight: 700; }
+nav a { color: #94a3b8; text-decoration: none; padding: 6px 12px; border-radius: 6px; }
+nav a.active, nav a:hover { color: #fff; background: #334155; }
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.page-header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 24px; }
+.page-header h1 { font-size: 30px; }
+.page-header p { color: #94a3b8; margin-top: 8px; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.input, .select, .button { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+.button { cursor: pointer; text-decoration: none; }
+.button:hover { border-color: #38bdf8; color: #38bdf8; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); gap: 20px; }
+.panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
+.panel-header { padding: 18px 20px; border-bottom: 1px solid #334155; }
+.panel-title { font-size: 18px; font-weight: 700; }
+.panel-subtitle { color: #94a3b8; font-size: 13px; margin-top: 6px; }
+.stage-list { display: grid; gap: 14px; padding: 18px; }
+.stage-card { border: 1px solid #334155; border-radius: 14px; background: rgba(15, 23, 42, .45); overflow: hidden; }
+.stage-card summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.stage-card summary::-webkit-details-marker { display: none; }
+.stage-meta { color: #94a3b8; font-size: 12px; }
+.artifact-items { display: grid; gap: 10px; padding: 0 16px 16px; }
+.artifact-item { border: 1px solid #334155; border-radius: 12px; padding: 12px; background: rgba(15, 23, 42, .55); }
+.artifact-item.active, .artifact-item:hover { border-color: #38bdf8; }
+.artifact-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.artifact-name { font-weight: 700; word-break: break-all; }
+.artifact-meta { margin-top: 6px; color: #94a3b8; font-size: 12px; }
+.artifact-actions { display: flex; gap: 8px; margin-top: 12px; }
+.preview { padding: 20px; min-height: 620px; }
+.preview-empty { color: #94a3b8; text-align: center; padding: 48px 20px; }
+.preview-image { max-width: 100%; border-radius: 12px; border: 1px solid #334155; }
+.preview-video { width: 100%; border-radius: 12px; border: 1px solid #334155; background: #000; }
+.preview-markdown { line-height: 1.75; }
+.preview-markdown h1, .preview-markdown h2, .preview-markdown h3 { margin: 18px 0 10px; }
+.preview-markdown p, .preview-markdown ul, .preview-markdown ol, .preview-markdown pre { margin: 10px 0; }
+.preview-markdown pre { background: #0f172a; padding: 12px; border-radius: 10px; overflow: auto; border: 1px solid #334155; }
+.preview-markdown code { background: rgba(148,163,184,.15); padding: 2px 6px; border-radius: 6px; }
+.preview-markdown a { color: #38bdf8; }
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">🧠 AI团队指挥台</div>
+  <a href="/">总览</a>
+  <a href="/team/agents">Agent作战</a>
+  <a href="/team/projects">项目流转</a>
+  <a href="/team/artifacts" class="active">成果物</a>
+  <a href="/team/alerts">告警中心</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>成果物中心</h1>
+      <p>按阶段分组，组内按时间倒序，支持搜索和筛选。现在是独立页面，不再挤在项目页侧栏。</p>
+    </div>
+    <div class="toolbar">
+      <select class="select" id="project-select"></select>
+      <input class="input" id="search-input" placeholder="搜索成果物文件名、路径、阶段" />
+      <button class="button" id="reload-btn" type="button">刷新</button>
+      <a class="button" id="back-link" href="/team/projects">返回项目页</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">阶段分组</div>
+        <div class="panel-subtitle" id="artifact-summary">正在加载成果物…</div>
+      </div>
+      <div class="stage-list" id="stage-list"><div class="preview-empty">正在加载…</div></div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-header">
+        <div class="panel-title" id="preview-title">预览区域</div>
+        <div class="panel-subtitle" id="preview-subtitle">点击左侧成果物进行预览</div>
+      </div>
+      <div class="preview" id="preview-area"><div class="preview-empty">请选择一个成果物。</div></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const API = '';
+const state = {
+  projectId: new URLSearchParams(location.search).get('project_id') || '',
+  query: new URLSearchParams(location.search).get('q') || '',
+  selectedPath: '',
+  projects: [],
+  grouped: null,
+};
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+}
+
+function formatTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+async function fetchJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (state.projectId) params.set('project_id', state.projectId);
+  if (state.query) params.set('q', state.query);
+  history.replaceState({}, '', `${location.pathname}?${params.toString()}`);
+  document.getElementById('back-link').href = state.projectId ? `/team/projects#${encodeURIComponent(state.projectId)}` : '/team/projects';
+}
+
+async function loadProjects() {
+  state.projects = await fetchJSON(`${API}/api/projects`);
+  const select = document.getElementById('project-select');
+  select.innerHTML = state.projects.map(project => `<option value="${escapeHtml(project.project_id)}">${escapeHtml(project.project_id)}</option>`).join('');
+  if (!state.projectId && state.projects.length) state.projectId = state.projects[0].project_id;
+  select.value = state.projectId;
+}
+
+function artifactType(artifact) {
+  return artifact.preview_type || 'download';
+}
+
+function artifactUrl(artifact, download = false) {
+  const suffix = download ? '&download=1' : '';
+  return `${API}/api/artifact?path=${encodeURIComponent(artifact.path)}${suffix}`;
+}
+
+function renderMarkdown(text) {
+  return escapeHtml(text)
+    .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+    .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+    .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/^-\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n\n+/g, '</p><p>')
+    .replace(/^(?!<h\d|<ul|<pre|<p|<li)(.+)$/gm, '<p>$1</p>');
+}
+
+async function previewArtifact(artifact) {
+  state.selectedPath = artifact.path;
+  renderGrouped();
+  document.getElementById('preview-title').textContent = artifact.name;
+  document.getElementById('preview-subtitle').textContent = `${artifact.stage} · ${formatTime(artifact.updated_at)}`;
+  const type = artifactType(artifact);
+  const url = artifactUrl(artifact);
+  const area = document.getElementById('preview-area');
+  if (type === 'image') {
+    area.innerHTML = `<img class="preview-image" src="${escapeHtml(url)}" alt="${escapeHtml(artifact.name)}">`;
+    return;
+  }
+  if (type === 'video') {
+    area.innerHTML = `<video class="preview-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
+    return;
+  }
+  if (type === 'markdown' || type === 'text') {
+    area.innerHTML = '<div class="preview-empty">正在加载文本预览…</div>';
+    const resp = await fetch(url);
+    const text = await resp.text();
+    area.innerHTML = type === 'markdown' ? `<div class="preview-markdown">${renderMarkdown(text)}</div>` : `<pre class="preview-markdown">${escapeHtml(text)}</pre>`;
+    return;
+  }
+  area.innerHTML = `<div class="preview-empty"><p>该文件类型暂不支持在线预览。</p><p style="margin-top:12px"><a class="button" href="${escapeHtml(artifactUrl(artifact, true))}">下载文件</a></p></div>`;
+}
+
+function renderGrouped() {
+  const stageList = document.getElementById('stage-list');
+  const grouped = state.grouped;
+  if (!grouped || !grouped.total) {
+    stageList.innerHTML = '<div class="preview-empty">当前筛选条件下没有成果物。</div>';
+    document.getElementById('artifact-summary').textContent = '0 个成果物';
+    return;
+  }
+  document.getElementById('artifact-summary').textContent = `${grouped.project_id} · ${grouped.total} 个成果物`;
+  stageList.innerHTML = grouped.stages.filter(stage => stage.count > 0).map(stage => `
+    <details class="stage-card" open>
+      <summary>
+        <strong>${escapeHtml(stage.stage)}</strong>
+        <span class="stage-meta">${stage.count} 个文件</span>
+      </summary>
+      <div class="artifact-items">
+        ${stage.items.map(item => `
+          <div class="artifact-item ${item.path === state.selectedPath ? 'active' : ''}" data-path="${escapeHtml(item.path)}">
+            <div class="artifact-head">
+              <div class="artifact-name">${escapeHtml(item.name)}</div>
+              <div class="stage-meta">${escapeHtml(item.preview_type)}</div>
+            </div>
+            <div class="artifact-meta">${escapeHtml(item.relative_path)}</div>
+            <div class="artifact-meta">更新时间 ${escapeHtml(formatTime(item.updated_at))}</div>
+            <div class="artifact-actions">
+              <button class="button" type="button" data-preview-path="${escapeHtml(item.path)}">预览</button>
+              <a class="button" href="${escapeHtml(artifactUrl(item, true))}">下载</a>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </details>
+  `).join('');
+
+  stageList.querySelectorAll('[data-preview-path]').forEach(button => {
+    button.addEventListener('click', () => {
+      const item = grouped.stages.flatMap(stage => stage.items).find(entry => entry.path === button.dataset.previewPath);
+      if (item) previewArtifact(item);
+    });
+  });
+}
+
+async function loadArtifacts() {
+  state.query = document.getElementById('search-input').value.trim();
+  state.projectId = document.getElementById('project-select').value;
+  syncUrl();
+  const url = `${API}/api/artifacts?grouped=1&project_id=${encodeURIComponent(state.projectId)}${state.query ? `&q=${encodeURIComponent(state.query)}` : ''}`;
+  state.grouped = await fetchJSON(url);
+  renderGrouped();
+  const first = state.grouped.stages.flatMap(stage => stage.items)[0];
+  if (first && !state.selectedPath) previewArtifact(first);
+  if (!first) document.getElementById('preview-area').innerHTML = '<div class="preview-empty">当前筛选条件下没有可预览成果物。</div>';
+}
+
+document.getElementById('search-input').value = state.query;
+document.getElementById('reload-btn').addEventListener('click', () => { state.selectedPath = ''; loadArtifacts(); });
+document.getElementById('search-input').addEventListener('input', () => { state.selectedPath = ''; loadArtifacts(); });
+document.getElementById('project-select').addEventListener('change', () => { state.selectedPath = ''; loadArtifacts(); });
+
+(async function init() {
+  await loadProjects();
+  syncUrl();
+  await loadArtifacts();
+})();
+</script>
+</body>
+</html>

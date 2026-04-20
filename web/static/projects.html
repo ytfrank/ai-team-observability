@@ -11,18 +11,15 @@ nav { background: #1e293b; padding: 12px 24px; display: flex; align-items: cente
 nav .logo { font-size: 18px; font-weight: 700; color: #38bdf8; }
 nav a { color: #94a3b8; text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
 nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
-.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.container { max-width: 1280px; margin: 0 auto; padding: 24px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
 .page-header h1 { font-size: 30px; }
 .page-header p { color: #94a3b8; margin-top: 8px; }
-.refresh-info { font-size: 12px; color: #64748b; }
-.layout { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(320px, .9fr); gap: 20px; align-items: start; }
-.panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
-.panel-header { padding: 18px 20px; border-bottom: 1px solid #334155; }
-.panel-title { font-size: 18px; font-weight: 700; }
-.panel-subtitle { color: #94a3b8; font-size: 13px; margin-top: 6px; }
-.project-groups { display: grid; gap: 14px; padding: 18px; }
-.group-card { border: 1px solid #334155; border-radius: 14px; overflow: hidden; background: rgba(15, 23, 42, .32); }
+.filters { display: flex; gap: 10px; align-items: center; }
+.badge-btn { border: 1px solid #334155; background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-decoration: none; }
+.badge-btn.active, .badge-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+.project-groups { display: grid; gap: 14px; }
+.group-card { border: 1px solid #334155; border-radius: 14px; overflow: hidden; background: #1e293b; }
 .group-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; }
 .group-card summary::-webkit-details-marker { display: none; }
 .group-main { display: flex; flex-direction: column; gap: 6px; }
@@ -40,34 +37,10 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
 .active-tag { background: #7f1d1d; color: #fecaca; }
 .muted { color: #94a3b8; font-size: 12px; }
 .block-reason { color: #fca5a5; font-size: 12px; }
-.version-actions { display: flex; justify-content: flex-end; }
-.button { border: 1px solid #475569; background: #0f172a; color: #e2e8f0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+.version-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.button { border: 1px solid #475569; background: #0f172a; color: #e2e8f0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; text-decoration: none; }
 .button:hover { border-color: #38bdf8; color: #38bdf8; }
-.button.primary { background: #2563eb; border-color: #2563eb; }
-.button.primary:hover { color: #fff; background: #1d4ed8; }
-.artifact-panel { min-height: 560px; display: flex; flex-direction: column; }
-.artifact-toolbar { padding: 16px 18px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.artifact-summary { color: #94a3b8; font-size: 12px; }
-.artifact-list { padding: 16px 18px; display: grid; gap: 10px; max-height: 320px; overflow: auto; border-bottom: 1px solid #334155; }
-.artifact-item { border: 1px solid #334155; border-radius: 12px; padding: 12px; background: rgba(15, 23, 42, .55); }
-.artifact-item.active { border-color: #38bdf8; }
-.artifact-item-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.artifact-name { font-weight: 600; word-break: break-all; }
-.artifact-meta { color: #94a3b8; font-size: 12px; margin-top: 6px; }
-.artifact-actions { display: flex; gap: 8px; margin-top: 12px; }
-.preview-area { padding: 18px; flex: 1; overflow: auto; }
-.preview-empty, .error-state { color: #94a3b8; padding: 32px 20px; text-align: center; }
-.error-state { color: #fca5a5; }
-.preview-frame { width: 100%; min-height: 320px; border: 1px solid #334155; border-radius: 12px; background: #0f172a; }
-.preview-image { max-width: 100%; border-radius: 12px; border: 1px solid #334155; }
-.preview-video { width: 100%; border-radius: 12px; border: 1px solid #334155; background: #000; }
-.preview-markdown { line-height: 1.75; }
-.preview-markdown h1, .preview-markdown h2, .preview-markdown h3 { margin: 18px 0 10px; }
-.preview-markdown p, .preview-markdown ul, .preview-markdown ol, .preview-markdown pre { margin: 10px 0; }
-.preview-markdown pre { background: #0f172a; padding: 12px; border-radius: 10px; overflow: auto; border: 1px solid #334155; }
-.preview-markdown code { background: rgba(148, 163, 184, .15); padding: 2px 6px; border-radius: 6px; }
-.preview-markdown a { color: #38bdf8; }
-@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+.empty { color: #94a3b8; text-align: center; padding: 48px 20px; background: #1e293b; border: 1px solid #334155; border-radius: 16px; }
 @media (max-width: 900px) {
   .page-header { flex-direction: column; align-items: flex-start; }
   .version-card { grid-template-columns: 1fr; }
@@ -81,6 +54,7 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
   <a href="/">总览</a>
   <a href="/team/agents">Agent作战</a>
   <a href="/team/projects" class="active">项目流转</a>
+  <a href="/team/artifacts">成果物</a>
   <a href="/team/alerts">告警中心</a>
 </nav>
 
@@ -88,44 +62,25 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
   <div class="page-header">
     <div>
       <h1>项目流转</h1>
-      <p>按主项目聚合版本，活跃版本置顶高亮，并提供成果物预览与下载入口。</p>
+      <p>按主项目聚合版本，活跃版本置顶高亮。成果物改为独立页面承载，不再塞进右侧侧栏。</p>
     </div>
-    <div class="refresh-info" id="refresh-info">正在加载…</div>
+    <div class="filters">
+      <a class="badge-btn" id="all-filter" href="/team/projects">全部项目</a>
+      <a class="badge-btn" id="blocked-filter" href="/team/projects?filter=blocked">只看 blocked</a>
+    </div>
   </div>
 
-  <div class="layout">
-    <section class="panel">
-      <div class="panel-header">
-        <div class="panel-title">项目版本分组</div>
-        <div class="panel-subtitle">归档版本自动灰显，点击“查看成果物”在右侧预览。</div>
-      </div>
-      <div class="project-groups" id="project-groups">
-        <div class="preview-empty">正在加载项目数据…</div>
-      </div>
-    </section>
-
-    <aside class="panel artifact-panel">
-      <div class="panel-header">
-        <div class="panel-title">成果物</div>
-        <div class="panel-subtitle" id="artifact-project-label">请先选择一个项目版本</div>
-      </div>
-      <div class="artifact-toolbar">
-        <div class="artifact-summary" id="artifact-summary">支持 Markdown、图片、MP4 预览，其他文件提供下载。</div>
-        <button class="button" id="artifact-refresh" type="button">刷新成果物</button>
-      </div>
-      <div class="artifact-list" id="artifact-list">
-        <div class="preview-empty">还没有选择项目版本。</div>
-      </div>
-      <div class="preview-area" id="preview-area">
-        <div class="preview-empty">选择成果物后会在这里预览。</div>
-      </div>
-    </aside>
+  <div class="project-groups" id="project-groups">
+    <div class="empty">正在加载项目数据…</div>
   </div>
 </div>
 
 <script>
 const API = '';
-const artifactState = { projectId: null, artifacts: [], selected: null };
+const query = new URLSearchParams(location.search);
+const blockedOnly = query.get('filter') === 'blocked';
+
+document.getElementById(blockedOnly ? 'blocked-filter' : 'all-filter').classList.add('active');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -185,39 +140,12 @@ async function fetchJSON(url) {
   return resp.json();
 }
 
-function artifactType(artifact) {
-  const path = String(artifact.path || artifact.relative_path || artifact.file_path || artifact.name || '').toLowerCase();
-  if (/\.(md|markdown)$/.test(path)) return 'markdown';
-  if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(path)) return 'image';
-  if (/\.(mp4|webm|mov)$/.test(path)) return 'video';
-  if (/\.(txt|json|log|csv|yml|yaml)$/.test(path)) return 'text';
-  return 'file';
-}
-
-function artifactLabel(artifact) {
-  return artifact.name || artifact.filename || artifact.relative_path || artifact.path || '未命名文件';
-}
-
-function artifactPath(artifact) {
-  return artifact.path || artifact.relative_path || artifact.file_path || '';
-}
-
-function artifactDownloadUrl(artifact) {
-  const direct = artifact.download_url || artifact.url;
-  if (direct) return direct;
-  const path = artifactPath(artifact);
-  return path ? `${API}/api/artifact?path=${encodeURIComponent(path)}` : '#';
-}
-
-async function loadProjects() {
-  const projects = await fetchJSON(API + '/api/projects');
-  renderProjectGroups(groupProjects(projects));
-}
-
-function renderProjectGroups(groups) {
+async function refresh() {
+  const projects = await fetchJSON(`${API}/api/projects${blockedOnly ? '?filter=blocked' : ''}`);
+  const groups = groupProjects(projects);
   const container = document.getElementById('project-groups');
   if (!groups.length) {
-    container.innerHTML = '<div class="preview-empty">暂无项目数据。</div>';
+    container.innerHTML = `<div class="empty">${blockedOnly ? '当前没有 blocked 项目。' : '暂无项目数据。'}</div>`;
     return;
   }
   container.innerHTML = groups.map((group) => `
@@ -245,145 +173,19 @@ function renderProjectGroups(groups) {
             <div class="muted">${project.is_overtime ? '⚠️ 已超时' : '进度正常'}</div>
             <div class="block-reason">${escapeHtml(project.block_reason || '')}</div>
             <div class="version-actions">
-              <button class="button primary" type="button" data-project-id="${escapeHtml(project.project_id)}">查看成果物</button>
+              <a class="button" href="/team/artifacts?project_id=${encodeURIComponent(project.project_id)}">查看成果物</a>
             </div>
           </div>
         `).join('')}
       </div>
     </details>
   `).join('');
-
-  container.querySelectorAll('[data-project-id]').forEach((button) => {
-    button.addEventListener('click', () => loadArtifacts(button.dataset.projectId));
-  });
 }
 
-async function loadArtifacts(projectId) {
-  artifactState.projectId = projectId;
-  artifactState.artifacts = [];
-  artifactState.selected = null;
-  document.getElementById('artifact-project-label').textContent = `当前项目: ${projectId}`;
-  document.getElementById('artifact-summary').textContent = '正在加载成果物…';
-  document.getElementById('artifact-list').innerHTML = '<div class="preview-empty">正在加载成果物列表…</div>';
-  document.getElementById('preview-area').innerHTML = '<div class="preview-empty">请选择要预览的成果物。</div>';
-
-  try {
-    const artifacts = await fetchJSON(`${API}/api/artifacts?project_id=${encodeURIComponent(projectId)}`);
-    artifactState.artifacts = Array.isArray(artifacts) ? artifacts : (artifacts.items || []);
-    renderArtifactList();
-    document.getElementById('artifact-summary').textContent = artifactState.artifacts.length ? `共 ${artifactState.artifacts.length} 个成果物` : '当前项目暂无成果物';
-    if (artifactState.artifacts.length) selectArtifact(artifactState.artifacts[0]);
-  } catch (error) {
-    document.getElementById('artifact-list').innerHTML = '<div class="error-state">成果物接口暂不可用，等待后端 /api/artifacts 接入后即可显示。</div>';
-    document.getElementById('preview-area').innerHTML = '<div class="preview-empty">当前无法预览，请先确认 /api/artifacts 与 /api/artifact 接口可用。</div>';
-    document.getElementById('artifact-summary').textContent = '成果物接口未就绪';
-    console.error('Artifact loading failed:', error);
-  }
-}
-
-function renderArtifactList() {
-  const list = document.getElementById('artifact-list');
-  if (!artifactState.artifacts.length) {
-    list.innerHTML = '<div class="preview-empty">当前项目还没有索引到成果物。</div>';
-    return;
-  }
-
-  list.innerHTML = artifactState.artifacts.map((artifact, index) => {
-    const path = artifactPath(artifact);
-    return `
-      <div class="artifact-item ${artifactState.selected && artifactPath(artifactState.selected) === path ? 'active' : ''}">
-        <div class="artifact-item-head">
-          <div>
-            <div class="artifact-name">${escapeHtml(artifactLabel(artifact))}</div>
-            <div class="artifact-meta">${escapeHtml(artifact.type || artifactType(artifact))} · 更新时间 ${escapeHtml(formatTime(artifact.updated_at || artifact.mtime || artifact.modified_at))}</div>
-          </div>
-        </div>
-        <div class="artifact-meta">${escapeHtml(path || artifact.description || '无路径信息')}</div>
-        <div class="artifact-actions">
-          <button class="button" type="button" data-preview-index="${index}">预览</button>
-          <a class="button" href="${escapeHtml(artifactDownloadUrl(artifact))}" download>下载</a>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  list.querySelectorAll('[data-preview-index]').forEach((button) => {
-    button.addEventListener('click', () => selectArtifact(artifactState.artifacts[Number(button.dataset.previewIndex)]));
-  });
-}
-
-async function selectArtifact(artifact) {
-  artifactState.selected = artifact;
-  renderArtifactList();
-  const preview = document.getElementById('preview-area');
-  const type = artifact.type || artifactType(artifact);
-  const url = artifact.preview_url || artifactDownloadUrl(artifact);
-
-  if (type === 'image') {
-    preview.innerHTML = `<img class="preview-image" src="${escapeHtml(url)}" alt="${escapeHtml(artifactLabel(artifact))}">`;
-    return;
-  }
-  if (type === 'video') {
-    preview.innerHTML = `<video class="preview-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
-    return;
-  }
-
-  if (type === 'markdown' || type === 'text') {
-    preview.innerHTML = '<div class="preview-empty">正在加载文本预览…</div>';
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await response.text();
-      preview.innerHTML = `<div class="preview-markdown">${type === 'markdown' ? renderMarkdown(text) : `<pre class="preview-frame">${escapeHtml(text)}</pre>`}</div>`;
-    } catch (error) {
-      preview.innerHTML = '<div class="error-state">文本预览失败，请改用下载查看。</div>';
-      console.error('Artifact preview failed:', error);
-    }
-    return;
-  }
-
-  preview.innerHTML = `
-    <div class="preview-empty">
-      <p>该文件类型暂不支持在线预览。</p>
-      <p style="margin-top:10px"><a class="button primary" href="${escapeHtml(url)}" download>下载文件</a></p>
-    </div>
-  `;
-}
-
-function renderMarkdown(text) {
-  return escapeHtml(text)
-    .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
-    .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
-    .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
-    .replace(/```([\s\S]*?)```/g, '<pre>$1</pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/^-\s+(.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-    .replace(/\n\n+/g, '</p><p>')
-    .replace(/^(?!<h\d|<ul|<pre|<p|<li)(.+)$/gm, '<p>$1</p>');
-}
-
-async function refresh() {
-  try {
-    await loadProjects();
-    document.getElementById('refresh-info').textContent = `最近刷新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
-    if (artifactState.projectId) await loadArtifacts(artifactState.projectId);
-  } catch (error) {
-    document.getElementById('project-groups').innerHTML = '<div class="error-state">项目数据加载失败，请检查 /api/projects。</div>';
-    document.getElementById('refresh-info').textContent = '刷新失败';
-    console.error('Project refresh failed:', error);
-  }
-}
-
-document.getElementById('artifact-refresh').addEventListener('click', () => {
-  if (artifactState.projectId) {
-    loadArtifacts(artifactState.projectId);
-  }
+refresh().catch((error) => {
+  document.getElementById('project-groups').innerHTML = '<div class="empty">项目数据加载失败，请检查 /api/projects。</div>';
+  console.error(error);
 });
-
-refresh();
-setInterval(refresh, 30000);
 </script>
 </body>
 </html>

@@ -13,19 +13,24 @@ nav a { color: #94a3b8; text-decoration: none; font-size: 14px; padding: 6px 12p
 nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
 .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-.stat-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+.stat-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; text-decoration: none; color: inherit; transition: .18s ease; display: block; }
+.stat-card:hover { border-color: #38bdf8; transform: translateY(-1px); }
 .stat-card .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
 .stat-card .value { font-size: 32px; font-weight: 700; margin-top: 4px; }
-.stat-card .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+.stat-card .sub { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+.trend { margin-top: 10px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.trend.up { color: #6ee7b7; }
+.trend.down { color: #fca5a5; }
+.trend.flat { color: #cbd5e1; }
 .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.agent-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; transition: border-color 0.2s; }
+.agent-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; transition: border-color 0.2s; text-decoration: none; color: inherit; }
 .agent-card:hover { border-color: #38bdf8; }
 .agent-card .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .agent-card .name { font-size: 16px; font-weight: 600; }
 .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
 .status-running { background: #064e3b; color: #6ee7b7; }
 .status-idle { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
-.status-blocked { background: #7f1d1d; color: #fca5a5; }
+.status-blocked, .status-error { background: #7f1d1d; color: #fca5a5; }
 .agent-card .detail { font-size: 13px; color: #94a3b8; margin-top: 8px; }
 .agent-card .detail span { color: #e2e8f0; }
 .projects-list { margin-top: 32px; display: grid; gap: 14px; }
@@ -60,6 +65,7 @@ nav a:hover, nav a.active { color: #e2e8f0; background: #334155; }
   <a href="/" class="active">总览</a>
   <a href="/team/agents">Agent作战</a>
   <a href="/team/projects">项目流转</a>
+  <a href="/team/artifacts">成果物</a>
   <a href="/team/alerts">告警中心</a>
 </nav>
 
@@ -80,6 +86,7 @@ const API = '';
 
 async function fetchJSON(url) {
   const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
 
@@ -88,16 +95,32 @@ function timeAgo(str) {
   const diff = (Date.now() - new Date(str).getTime()) / 1000;
   if (diff < 60) return `${Math.floor(diff)}秒前`;
   if (diff < 3600) return `${Math.floor(diff/60)}分钟前`;
-  return `${Math.floor(diff/3600)}小时前`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}小时前`;
+  return `${Math.floor(diff/86400)}天前`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+}
+
+function trendMarkup(trend) {
+  if (!trend) return '<div class="trend flat">≈ 与昨日持平</div>';
+  const icons = { up: '↑', down: '↓', flat: '→' };
+  const labels = {
+    up: `较昨日 +${trend.delta}`,
+    down: `较昨日 ${trend.delta}`,
+    flat: '与昨日持平',
+  };
+  return `<div class="trend ${trend.direction}">${icons[trend.direction] || '→'} ${labels[trend.direction] || '与昨日持平'}</div>`;
 }
 
 async function renderStats() {
   const stats = await fetchJSON(API + '/api/stats');
   document.getElementById('stats').innerHTML = `
-    <div class="stat-card"><div class="label">活跃Agent</div><div class="value" style="color:#6ee7b7">${stats.agents.active}/${stats.agents.total}</div><div class="sub">当前在线</div></div>
-    <div class="stat-card"><div class="label">项目总数</div><div class="value" style="color:#93c5fd">${stats.projects.total}</div><div class="sub">阻塞: ${stats.projects.blocked}</div></div>
-    <div class="stat-card"><div class="label">24h事件</div><div class="value">${stats.events_24h}</div><div class="sub">自动采集</div></div>
-    <div class="stat-card"><div class="label">24h Token</div><div class="value">${(stats.tokens_24h.input + stats.tokens_24h.output).toLocaleString()}</div><div class="sub">输入:${stats.tokens_24h.input.toLocaleString()} 输出:${stats.tokens_24h.output.toLocaleString()}</div></div>
+    <a class="stat-card" href="/team/agents"><div class="label">活跃Agent</div><div class="value" style="color:#6ee7b7">${stats.agents.active}/${stats.agents.total}</div><div class="sub">点击进入 Agent 白盒页</div>${trendMarkup(stats.agents.delta)}</a>
+    <a class="stat-card" href="/team/projects"><div class="label">项目总数</div><div class="value" style="color:#93c5fd">${stats.projects.total}</div><div class="sub">阻塞: ${stats.projects.blocked}，点击进入项目流转</div>${trendMarkup(stats.projects.delta)}</a>
+    <a class="stat-card" href="/team/agents#recent-events"><div class="label">24h事件</div><div class="value">${stats.events_24h}</div><div class="sub">点击查看最近事件</div>${trendMarkup(stats.events_delta)}</a>
+    <a class="stat-card" href="/team/projects?filter=blocked"><div class="label">阻塞项目</div><div class="value" style="color:#fca5a5">${stats.projects.blocked}</div><div class="sub">点击筛选 blocked 项目</div>${trendMarkup(stats.projects.blocked_delta)}</a>
   `;
 }
 
@@ -105,21 +128,18 @@ async function renderAgents() {
   const agents = await fetchJSON(API + '/api/agents');
   const roleEmoji = {peter:'⚙️', guard:'🛡️', doraemon:'🔔', atlas:'🚀', jarvis:'🏠', munger:'💰'};
   document.getElementById('agents').innerHTML = agents.map(a => `
-    <div class="agent-card">
+    <a class="agent-card" href="/team/agents?agent=${encodeURIComponent(a.agent_name)}">
       <div class="header">
         <div class="name">${roleEmoji[a.agent_name]||'🤖'} ${a.agent_name}</div>
         <span class="status-badge status-${a.status}">${a.status}</span>
       </div>
-      <div class="detail">项目: <span>${a.current_project || '—'}</span></div>
-      <div class="detail">阶段: <span>${a.current_stage || '—'}</span></div>
-      <div class="detail">任务: <span>${a.current_task || '—'}</span></div>
+      <div class="detail">项目: <span>${escapeHtml(a.current_project || '—')}</span></div>
+      <div class="detail">阶段: <span>${escapeHtml(a.current_stage || '—')}</span></div>
+      <div class="detail">最近事件: <span>${a.timeline_events || 0}</span></div>
+      <div class="detail">A2A / Sub-agent: <span>${a.a2a_events || 0} / ${a.subagent_events || 0}</span></div>
       <div class="detail">最后活动: <span>${timeAgo(a.last_action_time)}</span></div>
-    </div>
+    </a>
   `).join('');
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 }
 
 function parseProject(projectId) {
@@ -186,6 +206,7 @@ async function renderProjects() {
 async function refresh() {
   try {
     await Promise.all([renderStats(), renderAgents(), renderProjects()]);
+    document.getElementById('refresh-info').textContent = `最近刷新 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
   } catch(e) { console.error('Refresh failed:', e); }
 }
 

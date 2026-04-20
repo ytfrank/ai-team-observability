@@ -1,3 +1,288 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI团队指挥台</title>
-<style>body{background:#0f172a;color:#e2e8f0;font-family:system-ui;padding:40px;text-align:center}h1{margin-bottom:16px}a{color:#38bdf8}</style>
-</head><body><h1>🚧 页面建设中</h1><p>数据已通过API就绪，详情页开发中。</p><p><a href="/">← 返回总览</a></p></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI团队指挥台 - Agent作战</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+nav { background: #1e293b; padding: 12px 24px; display: flex; gap: 24px; border-bottom: 1px solid #334155; }
+nav .logo { color: #38bdf8; font-weight: 700; }
+nav a { color: #94a3b8; text-decoration: none; padding: 6px 12px; border-radius: 6px; }
+nav a.active, nav a:hover { color: #fff; background: #334155; }
+.container { max-width: 1380px; margin: 0 auto; padding: 24px; }
+.page-header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 24px; }
+.page-header h1 { font-size: 30px; }
+.page-header p { color: #94a3b8; margin-top: 8px; }
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.select, .button, .input { background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: #e2e8f0; padding: 10px 12px; }
+.button { cursor: pointer; }
+.button:hover { border-color: #38bdf8; color: #38bdf8; }
+.layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; }
+.panel { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
+.panel-header { padding: 18px 20px; border-bottom: 1px solid #334155; }
+.panel-title { font-size: 18px; font-weight: 700; }
+.panel-subtitle { margin-top: 6px; color: #94a3b8; font-size: 13px; }
+.agent-list { display: grid; gap: 12px; padding: 16px; }
+.agent-card { background: rgba(15, 23, 42, .55); border: 1px solid #334155; border-radius: 14px; padding: 16px; cursor: pointer; }
+.agent-card.active, .agent-card:hover { border-color: #38bdf8; }
+.agent-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.agent-name { font-size: 16px; font-weight: 700; }
+.badge { padding: 4px 9px; border-radius: 999px; font-size: 11px; }
+.badge.running { background: #064e3b; color: #6ee7b7; }
+.badge.idle { background: #334155; color: #cbd5e1; }
+.badge.error { background: #7f1d1d; color: #fecaca; }
+.agent-meta { color: #94a3b8; font-size: 12px; margin-top: 6px; }
+.detail-grid { display: grid; gap: 20px; padding: 20px; }
+.hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric { background: rgba(15, 23, 42, .55); border: 1px solid #334155; border-radius: 14px; padding: 14px; }
+.metric-label { color: #94a3b8; font-size: 12px; }
+.metric-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.timeline, .heatmap, .record-list { display: grid; gap: 10px; }
+.timeline-item, .record-item { border: 1px solid #334155; border-radius: 14px; padding: 14px; background: rgba(15, 23, 42, .45); }
+.timeline-head, .record-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.timeline-title, .record-title { font-weight: 700; }
+.timeline-meta, .record-meta { font-size: 12px; color: #94a3b8; }
+.timeline-detail, .record-detail { font-size: 13px; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap; }
+.section-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(24, minmax(12px, 1fr)); gap: 4px; }
+.heat-cell { aspect-ratio: 1 / 1; border-radius: 4px; background: rgba(148, 163, 184, .14); position: relative; }
+.heat-cell:hover::after { content: attr(data-tip); position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 6px); white-space: nowrap; background: #020617; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 11px; z-index: 3; }
+.day-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; }
+.day-label { color: #94a3b8; font-size: 12px; }
+.anchor { color: #38bdf8; text-decoration: none; }
+.empty { padding: 36px 20px; color: #94a3b8; text-align: center; }
+@media (max-width: 1080px) {
+  .layout { grid-template-columns: 1fr; }
+  .hero { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .hero { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">🧠 AI团队指挥台</div>
+  <a href="/">总览</a>
+  <a href="/team/agents" class="active">Agent作战</a>
+  <a href="/team/projects">项目流转</a>
+  <a href="/team/artifacts">成果物</a>
+  <a href="/team/alerts">告警中心</a>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h1>Agent 白盒页</h1>
+      <p>活动时间线、Sub-agent 记录、A2A 通信和热力图都在这里，默认展示最近 7 天。</p>
+    </div>
+    <div class="toolbar">
+      <select class="select" id="range-select">
+        <option value="today">今天</option>
+        <option value="7d" selected>最近7天</option>
+        <option value="custom">最近30天</option>
+      </select>
+      <input class="input" id="agent-search" placeholder="搜索 agent 名称" />
+      <button class="button" id="reload-btn" type="button">刷新</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Agent 列表</div>
+        <div class="panel-subtitle">点击左侧 Agent 查看时间线、A2A 和 sub-agent 记录</div>
+      </div>
+      <div class="agent-list" id="agent-list"><div class="empty">正在加载 Agent 数据…</div></div>
+    </aside>
+
+    <main class="panel">
+      <div class="panel-header">
+        <div class="panel-title" id="detail-title">选择一个 Agent</div>
+        <div class="panel-subtitle" id="detail-subtitle">可以从总览页点击卡片直接跳转进来</div>
+      </div>
+      <div class="detail-grid" id="detail-area"><div class="empty">左侧选中一个 Agent 后，这里会显示详细活动。</div></div>
+    </main>
+  </div>
+</div>
+
+<script>
+const API = '';
+const state = { agents: [], selectedAgent: new URLSearchParams(location.search).get('agent') || '', range: new URLSearchParams(location.search).get('range') || '7d' };
+const dayLabels = ['周一','周二','周三','周四','周五','周六','周日'];
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+}
+
+function timeText(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function timeAgo(value) {
+  if (!value) return '—';
+  const diff = (Date.now() - new Date(value).getTime()) / 1000;
+  if (diff < 60) return `${Math.max(1, Math.floor(diff))}秒前`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+  return `${Math.floor(diff / 86400)}天前`;
+}
+
+async function fetchJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function colorForCount(count, max) {
+  if (!count) return 'rgba(148,163,184,.12)';
+  const ratio = Math.max(.12, count / Math.max(1, max));
+  return `rgba(56, 189, 248, ${Math.min(.95, ratio)})`;
+}
+
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (state.selectedAgent) params.set('agent', state.selectedAgent);
+  if (state.range) params.set('range', state.range);
+  history.replaceState({}, '', `${location.pathname}?${params.toString()}`);
+}
+
+async function loadAgents() {
+  const agents = await fetchJSON(`${API}/api/agents?range=${encodeURIComponent(state.range)}`);
+  state.agents = agents;
+  if (!state.selectedAgent && agents.length) state.selectedAgent = agents[0].agent_name;
+  renderAgentList();
+  if (state.selectedAgent) loadAgentDetail(state.selectedAgent);
+}
+
+function renderAgentList() {
+  const query = document.getElementById('agent-search').value.trim().toLowerCase();
+  const filtered = state.agents.filter(agent => agent.agent_name.toLowerCase().includes(query));
+  const list = document.getElementById('agent-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">没有匹配的 Agent。</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(agent => `
+    <div class="agent-card ${agent.agent_name === state.selectedAgent ? 'active' : ''}" data-agent="${escapeHtml(agent.agent_name)}">
+      <div class="agent-top">
+        <div class="agent-name">${escapeHtml(agent.agent_name)}</div>
+        <span class="badge ${escapeHtml(agent.status || 'idle')}">${escapeHtml(agent.status || 'idle')}</span>
+      </div>
+      <div class="agent-meta">当前项目: ${escapeHtml(agent.current_project || '—')}</div>
+      <div class="agent-meta">最近 24h 事件: ${agent.events_24h || 0}</div>
+      <div class="agent-meta">Sub-agent / A2A: ${agent.subagent_events || 0} / ${agent.a2a_events || 0}</div>
+      <div class="agent-meta">最后活动: ${timeAgo(agent.last_action_time)}</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-agent]').forEach(node => {
+    node.addEventListener('click', () => {
+      state.selectedAgent = node.dataset.agent;
+      syncUrl();
+      renderAgentList();
+      loadAgentDetail(state.selectedAgent);
+    });
+  });
+}
+
+function renderHeatmap(heatmap) {
+  const max = Math.max(0, ...heatmap.map(item => item.count));
+  return dayLabels.map((label, weekday) => {
+    const row = heatmap.filter(item => item.weekday === weekday);
+    return `
+      <div class="day-row">
+        <div class="day-label">${label}</div>
+        <div class="heatmap-grid">
+          ${row.map(item => `<div class="heat-cell" style="background:${colorForCount(item.count, max)}" data-tip="${label} ${String(item.hour).padStart(2, '0')}:00 · ${item.count} 条"></div>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRecords(items, emptyText) {
+  if (!items.length) return `<div class="empty">${emptyText}</div>`;
+  return `<div class="record-list">${items.map(item => `
+    <div class="record-item">
+      <div class="record-head">
+        <div class="record-title">${escapeHtml(item.title)}</div>
+        <div class="record-meta">${timeText(item.time)}</div>
+      </div>
+      <div class="record-meta">${escapeHtml(item.counterparty || item.project_id || '未识别对端')}</div>
+      <div class="record-detail">${escapeHtml(item.detail || '无更多细节')}</div>
+    </div>
+  `).join('')}</div>`;
+}
+
+async function loadAgentDetail(agentName) {
+  const detail = await fetchJSON(`${API}/api/agent_detail?agent=${encodeURIComponent(agentName)}&range=${encodeURIComponent(state.range)}`);
+  document.getElementById('detail-title').textContent = `${agentName} 详情`;
+  document.getElementById('detail-subtitle').textContent = `范围: ${detail.range.key}，最新活动 ${timeAgo(detail.summary.latest_event_time)}`;
+  document.getElementById('detail-area').innerHTML = `
+    <section>
+      <div class="hero">
+        <div class="metric"><div class="metric-label">总事件</div><div class="metric-value">${detail.summary.total_events}</div></div>
+        <div class="metric"><div class="metric-label">Sub-agent 记录</div><div class="metric-value">${detail.summary.subagent_events}</div></div>
+        <div class="metric"><div class="metric-label">A2A 通信</div><div class="metric-value">${detail.summary.a2a_events}</div></div>
+        <div class="metric"><div class="metric-label">错误事件</div><div class="metric-value">${detail.summary.error_events}</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">活动热力图</div>
+      <div class="heatmap">${renderHeatmap(detail.heatmap || [])}</div>
+    </section>
+
+    <section>
+      <div class="section-title">活动时间线</div>
+      <div class="timeline">${(detail.timeline || []).slice(0, 30).map(item => `
+        <div class="timeline-item">
+          <div class="timeline-head">
+            <div class="timeline-title">${escapeHtml(item.title)}</div>
+            <div class="timeline-meta">${timeText(item.time)}</div>
+          </div>
+          <div class="timeline-meta">类型: ${escapeHtml(item.kind)}${item.project_id ? ` · 项目 ${escapeHtml(item.project_id)}` : ''}</div>
+          <div class="timeline-detail">${escapeHtml(item.detail || '无更多细节')}</div>
+        </div>
+      `).join('') || '<div class="empty">当前时间范围内没有时间线事件。</div>'}</div>
+    </section>
+
+    <section>
+      <div class="section-title">Sub-agent 记录</div>
+      ${renderRecords(detail.subagents || [], '当前时间范围内没有识别到 sub-agent 记录。')}
+    </section>
+
+    <section>
+      <div class="section-title">A2A 通信</div>
+      ${renderRecords(detail.a2a || [], '当前时间范围内没有识别到 A2A 通信。')}
+    </section>
+
+    <section id="recent-events">
+      <div class="section-title">相关入口</div>
+      <div class="timeline-item">
+        <div class="timeline-title"><a class="anchor" href="/team/projects">查看项目流转</a></div>
+        <div class="timeline-detail">需要顺着项目继续排查时，从这里跳转到项目流转页或成果物页。</div>
+      </div>
+    </section>
+  `;
+}
+
+async function refresh() {
+  state.range = document.getElementById('range-select').value;
+  syncUrl();
+  await loadAgents();
+}
+
+document.getElementById('range-select').value = state.range;
+document.getElementById('range-select').addEventListener('change', refresh);
+document.getElementById('agent-search').addEventListener('input', renderAgentList);
+document.getElementById('reload-btn').addEventListener('click', refresh);
+refresh();
+</script>
+</body>
+</html>

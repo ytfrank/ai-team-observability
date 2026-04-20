@@ -47,11 +47,26 @@ class FakeHandler:
     _load_project_records = MonitorHandler._load_project_records
     _api_alerts = MonitorHandler._api_alerts
     _api_projects = MonitorHandler._api_projects
+    _api_agents = MonitorHandler._api_agents
+    _api_agent_detail = MonitorHandler._api_agent_detail
     _api_artifacts = MonitorHandler._api_artifacts
     _api_artifact = MonitorHandler._api_artifact
     _preview_type = MonitorHandler._preview_type
     _content_type = MonitorHandler._content_type
     _is_safe_artifact_path = MonitorHandler._is_safe_artifact_path
+    _range_start = MonitorHandler._range_start
+    _parse_datetime = MonitorHandler._parse_datetime
+    _parse_payload = MonitorHandler._parse_payload
+    _classify_event = MonitorHandler._classify_event
+    _event_title = MonitorHandler._event_title
+    _event_detail = MonitorHandler._event_detail
+    _extract_counterparty = MonitorHandler._extract_counterparty
+    _normalize_agent_event = MonitorHandler._normalize_agent_event
+    _agent_summary = MonitorHandler._agent_summary
+    _build_heatmap = MonitorHandler._build_heatmap
+    _group_artifacts = MonitorHandler._group_artifacts
+    _artifact_stage_rank = MonitorHandler._artifact_stage_rank
+    _trend = MonitorHandler._trend
 
 
 class APIServerBackendTest(unittest.TestCase):
@@ -64,6 +79,7 @@ class APIServerBackendTest(unittest.TestCase):
         init_db(self.db_path)
         self._seed_projects()
         self._seed_alerts()
+        self._seed_agents_and_events()
         self.old_projects_home = api_server.PROJECTS_HOME
         api_server.PROJECTS_HOME = self.projects_home
 
@@ -75,12 +91,14 @@ class APIServerBackendTest(unittest.TestCase):
         vb_v16 = self.projects_home / 'voice-bridge' / 'monitor' / 'v1.6'
         vb_v17 = self.projects_home / 'voice-bridge' / 'monitor' / 'v1.7'
         obs_v3 = self.projects_home / 'ai-team-observability' / 'monitor' / 'v3'
-        for path in [vb_v16 / 'qa', vb_v17 / 'deploy', obs_v3 / 'requirements']:
+        for path in [vb_v16 / 'qa', vb_v17 / 'deploy', obs_v3 / 'requirements', obs_v3 / 'dev', obs_v3 / 'handoffs']:
             path.mkdir(parents=True, exist_ok=True)
 
         (vb_v16 / 'qa' / 'report.md').write_text('# report v1.6\n', encoding='utf-8')
         (vb_v17 / 'deploy' / 'demo.mp4').write_bytes(b'mp4-bytes')
         (obs_v3 / 'requirements' / 'REQUIREMENTS.md').write_text('# requirements\n', encoding='utf-8')
+        (obs_v3 / 'dev' / 'SUBMISSION.md').write_text('# submission\n', encoding='utf-8')
+        (obs_v3 / 'handoffs' / '001-dev-to-test.md').write_text('# handoff\n', encoding='utf-8')
 
         (vb_v16 / 'status.json').write_text('''{
           "project_id": "voice-bridge-v1.6",
@@ -128,6 +146,27 @@ class APIServerBackendTest(unittest.TestCase):
         conn.commit()
         conn.close()
 
+    def _seed_agents_and_events(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.execute(
+            """INSERT INTO agg_agent_status (agent_name, status, current_project, current_task, current_stage, task_start_time, last_action_time, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            ('peter', 'running', 'ai-team-observability-v4', 'Build V4 P0 pages', 'developing', '2026-04-20T06:00:00Z', '2026-04-20T07:00:00Z', '2026-04-20T07:00:00Z'),
+        )
+        events = [
+            ('evt-1', '2026-04-20T06:50:00Z', 'session', 'peter', 'ai-team-observability-v4', 'tool', 'message', 'info', None, None, 0, 0, 'sessions_send guard: 开发完成请测试', '{"tool":"sessions_send","target":"guard"}'),
+            ('evt-2', '2026-04-20T06:40:00Z', 'session', 'peter', 'ai-team-observability-v4', 'tool', 'message', 'info', None, None, 0, 0, 'spawn subagent frontend-dev for artifacts page', '{"tool":"sessions_spawn","label":"frontend-dev"}'),
+            ('evt-3', '2026-04-20T06:30:00Z', 'session', 'peter', 'ai-team-observability-v4', 'llm', 'message', 'info', None, None, 0, 0, 'Implemented dashboard clickable cards', '{"message":"dashboard update"}'),
+            ('evt-4', '2026-04-20T06:20:00Z', 'session', 'peter', 'ai-team-observability-v4', 'lifecycle', 'message', 'error', None, None, 0, 0, 'tool error: preview failed once', '{"error":"preview failed once"}'),
+        ]
+        conn.executemany(
+            """INSERT INTO event_log (event_id, event_time, source_type, agent_name, project_id, event_category, event_type, severity, provider, model, input_tokens, output_tokens, summary, payload_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            events,
+        )
+        conn.commit()
+        conn.close()
+
     def test_alerts_api_respects_limit_and_order(self):
         handler = FakeHandler(str(self.db_path))
         handler._api_alerts({'limit': ['1']})
@@ -152,12 +191,36 @@ class APIServerBackendTest(unittest.TestCase):
         self.assertEqual(obs['version'], 'v3')
         self.assertEqual(obs['current_stage'], 'developing')
 
+    def test_agents_api_includes_a2a_and_subagent_counts(self):
+        handler = FakeHandler(str(self.db_path))
+        handler._api_agents({'range': ['7d']})
+        peter = next(agent for agent in handler.payload if agent['agent_name'] == 'peter')
+        self.assertEqual(peter['a2a_events'], 1)
+        self.assertEqual(peter['subagent_events'], 1)
+        self.assertGreaterEqual(peter['timeline_events'], 4)
+
+    def test_agent_detail_api_returns_timeline_and_heatmap(self):
+        handler = FakeHandler(str(self.db_path))
+        handler._api_agent_detail({'agent': ['peter'], 'range': ['7d']})
+        self.assertEqual(handler.status, 200)
+        self.assertEqual(handler.payload['agent']['agent_name'], 'peter')
+        self.assertEqual(len(handler.payload['subagents']), 1)
+        self.assertEqual(len(handler.payload['a2a']), 1)
+        self.assertEqual(len(handler.payload['heatmap']), 7 * 24)
+
     def test_artifacts_api_indexes_previewable_files(self):
         handler = FakeHandler(str(self.db_path))
         handler._api_artifacts({'project_id': ['ai-team-observability-v3']})
         item = next(artifact for artifact in handler.payload if artifact['name'] == 'REQUIREMENTS.md')
         self.assertEqual(item['preview_type'], 'markdown')
         self.assertEqual(item['stage'], 'requirements')
+
+    def test_artifacts_api_supports_stage_grouping_and_ordering(self):
+        handler = FakeHandler(str(self.db_path))
+        handler._api_artifacts({'project_id': ['ai-team-observability-v3'], 'grouped': ['1']})
+        self.assertEqual(handler.payload['total'], 4)
+        self.assertEqual(handler.payload['stages'][0]['stage'], 'requirements')
+        self.assertEqual(handler.payload['stages'][0]['items'][0]['name'], 'REQUIREMENTS.md')
 
     def test_artifact_api_streams_file_inline(self):
         file_path = self.projects_home / 'ai-team-observability' / 'monitor' / 'v3' / 'requirements' / 'REQUIREMENTS.md'
@@ -172,6 +235,18 @@ class APIServerBackendTest(unittest.TestCase):
         self.assertIn('告警中心', page)
         self.assertIn('/api/alerts?limit=100', page)
         self.assertIn('alert-table-body', page)
+
+    def test_agents_page_contains_detail_sections(self):
+        page = Path('web/static/agents.html').read_text(encoding='utf-8')
+        self.assertIn('Agent 白盒页', page)
+        self.assertIn('活动热力图', page)
+        self.assertIn('/api/agent_detail', page)
+
+    def test_artifacts_page_contains_search_and_preview(self):
+        page = Path('web/static/artifacts.html').read_text(encoding='utf-8')
+        self.assertIn('成果物中心', page)
+        self.assertIn('搜索成果物文件名、路径、阶段', page)
+        self.assertIn('/api/artifacts?grouped=1', page)
 
 
 if __name__ == '__main__':
