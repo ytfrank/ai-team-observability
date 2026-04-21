@@ -130,8 +130,8 @@ class MonitorHandler(BaseHTTPRequestHandler):
                 related = grouped_events.get(item['agent_name'], [])
                 item['events_24h'] = sum(1 for event in related if self._parse_datetime(event['event_time']) >= datetime.now(timezone.utc) - timedelta(days=1))
                 item['timeline_events'] = len(related)
-                item['subagent_events'] = sum(1 for event in related if self._classify_event(event) == 'subagent')
-                item['a2a_events'] = sum(1 for event in related if self._classify_event(event) == 'a2a')
+                item['subagent_events'] = sum(1 for event in related if self._is_subagent_kind(self._classify_event(event)))
+                item['a2a_events'] = sum(1 for event in related if self._is_a2a_kind(self._classify_event(event)))
                 item['last_summary'] = next((self._event_title(event) for event in related if self._event_title(event)), None)
                 enriched.append(item)
             self.json_response(enriched)
@@ -174,13 +174,17 @@ class MonitorHandler(BaseHTTPRequestHandler):
             ).fetchall()
             events = [dict(row) for row in rows]
             timeline = [self._normalize_agent_event(event) for event in events]
+            agent_info = dict(agent_row)
+            # BUG-3: normalize current_stage to new short-form so the frontend banner works
+            if agent_info.get('current_stage'):
+                agent_info['current_stage'] = self._normalize_stage(agent_info['current_stage'])
             detail = {
-                'agent': dict(agent_row),
+                'agent': agent_info,
                 'range': {'key': range_key, 'start': start_time.isoformat(), 'end': end_time.isoformat()},
                 'summary': self._agent_summary(events),
                 'timeline': timeline,
-                'subagents': [event for event in timeline if event['kind'] == 'subagent'],
-                'a2a': [event for event in timeline if event['kind'] == 'a2a'],
+                'subagents': [event for event in timeline if self._is_subagent_kind(event['kind'])],
+                'a2a': [event for event in timeline if self._is_a2a_kind(event['kind'])],
                 'heatmap': self._build_heatmap(events),
             }
             self.json_response(detail)
@@ -456,8 +460,27 @@ class MonitorHandler(BaseHTTPRequestHandler):
         }
 
     def _stage_priority(self, stage):
-        order = {'developing': 6, 'testing': 5, 'deploying': 4, 'deployed': 3, 'accepting': 2, 'planned': 1, 'done': 0}
+        order = {
+            # Pre-dev / planning
+            'requirements': 7,
+            # New short-form names (V5+)
+            'develop': 6, 'test': 5, 'deploy': 4,
+            # Old long-form names (V3/V4 compat)
+            'developing': 6, 'testing': 5, 'deploying': 4,
+            # Artifact stage aliases (V3/V4 status.json compat)
+            'dev': 6, 'qa': 5, 'acceptance': 2,
+            # Shared terminal/special stages
+            'deployed': 3, 'accepting': 2, 'planned': 1,
+            'done': 0, 'archived': -2, 'blocked': -3,
+        }
         return order.get(stage or '', -1)
+
+    def _normalize_stage(self, stage):
+        """Map old long-form stage names to canonical new short-form names."""
+        _map = {'developing': 'develop', 'testing': 'test', 'deploying': 'deploy'}
+        if not stage:
+            return stage
+        return _map.get(stage, stage)
 
     def _artifact_stage_rank(self, stage):
         if stage in ARTIFACT_STAGES:
@@ -528,19 +551,75 @@ class MonitorHandler(BaseHTTPRequestHandler):
             return {}
 
     def _classify_event(self, event):
+        """Return a fine-grained event kind for the frontend milestone UI.
+
+        Classification priority:
+          1. event_category from DB (authoritative, written by collector)
+          2. severity field
+          3. Text-based fallback (summary + payload)
+
+        Supported kinds: stage_enter, stage_exit, artifact_commit,
+        subagent_spawn, subagent_return, a2a_send, a2a_receive,
+        error, warning, tool, timeline.
+        """
+        category = (event.get('event_category') or '').lower()
+        event_type = (event.get('event_type') or '').lower()
+        severity = (event.get('severity') or '').lower()
         summary = (event.get('summary') or '').lower()
         payload = self._parse_payload(event.get('payload_json'))
         payload_text = json.dumps(payload, ensure_ascii=False).lower() if payload else ''
         combined = f'{summary} {payload_text}'
+
+        # Primary: use event_category written by collector (authoritative)
+        if category == 'milestone':
+            if 'stage_exit' in event_type or 'stage_exit' in summary:
+                return 'stage_exit'
+            if 'artifact' in event_type:
+                return 'artifact_commit'
+            return 'stage_enter'
+
+        if category == 'a2a':
+            if any(kw in event_type for kw in ('recv', 'receive')):
+                return 'a2a_receive'
+            if 'a2a_receive' in combined or 'received' in summary:
+                return 'a2a_receive'
+            return 'a2a_send'
+
+        if category == 'subagent':
+            if any(kw in event_type for kw in ('return', 'exit', 'complete', 'done')):
+                return 'subagent_return'
+            if any(kw in summary for kw in ('return', 'exit', 'complete', 'done', 'finish')):
+                return 'subagent_return'
+            return 'subagent_spawn'
+
+        # Severity-based classification
+        if severity == 'error':
+            return 'error'
+        if severity == 'warning':
+            return 'warning'
+
+        # Text-based fallback for events without event_category
         if 'sessions_send' in combined or 'a2a' in combined or 'agent-to-agent' in combined:
-            return 'a2a'
+            if 'a2a_receive' in combined or 'recv' in combined:
+                return 'a2a_receive'
+            return 'a2a_send'
         if 'subagent' in combined or 'session:' in combined or 'spawn' in combined:
-            return 'subagent'
-        if 'error' in combined or event.get('severity') == 'error':
+            if any(kw in combined for kw in ('_return', 'exit', 'complete', 'done', 'finish', 'completed')):
+                return 'subagent_return'
+            return 'subagent_spawn'
+        if 'error' in combined:
             return 'error'
         if 'tool' in combined or 'read(' in combined or 'exec' in combined:
             return 'tool'
         return 'timeline'
+
+    def _is_subagent_kind(self, kind):
+        """True for any subagent-family kind (supports both old and new names)."""
+        return kind in {'subagent', 'subagent_spawn', 'subagent_return'}
+
+    def _is_a2a_kind(self, kind):
+        """True for any a2a-family kind (supports both old and new names)."""
+        return kind in {'a2a', 'a2a_send', 'a2a_receive'}
 
     def _event_title(self, event):
         summary = (event.get('summary') or '').strip()
@@ -595,8 +674,8 @@ class MonitorHandler(BaseHTTPRequestHandler):
         latest_time = events[0]['event_time'] if events else None
         return {
             'total_events': len(events),
-            'subagent_events': sum(1 for event in events if self._classify_event(event) == 'subagent'),
-            'a2a_events': sum(1 for event in events if self._classify_event(event) == 'a2a'),
+            'subagent_events': sum(1 for event in events if self._is_subagent_kind(self._classify_event(event))),
+            'a2a_events': sum(1 for event in events if self._is_a2a_kind(self._classify_event(event))),
             'error_events': sum(1 for event in events if self._classify_event(event) == 'error'),
             'latest_event_time': latest_time,
         }

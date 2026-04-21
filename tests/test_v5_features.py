@@ -62,12 +62,16 @@ class FakeHandler:
     _parse_limit = MonitorHandler._parse_limit
     _group_projects = MonitorHandler._group_projects
     _stage_priority = MonitorHandler._stage_priority
+    _normalize_stage = MonitorHandler._normalize_stage
     _load_project_records = MonitorHandler._load_project_records
     _api_alerts = MonitorHandler._api_alerts
     _api_projects = MonitorHandler._api_projects
     _api_agents = MonitorHandler._api_agents
+    _api_agent_detail = MonitorHandler._api_agent_detail
     _api_stats = MonitorHandler._api_stats
     _classify_event = MonitorHandler._classify_event
+    _is_subagent_kind = MonitorHandler._is_subagent_kind
+    _is_a2a_kind = MonitorHandler._is_a2a_kind
     _event_title = MonitorHandler._event_title
     _event_detail = MonitorHandler._event_detail
     _extract_counterparty = MonitorHandler._extract_counterparty
@@ -627,37 +631,37 @@ class TestClassifyEvent(unittest.TestCase):
 
     def test_a2a_send_by_sessions_send_in_summary(self):
         ev = self._event(summary='sessions_send guard: please review')
-        self.assertEqual(self.h._classify_event(ev), 'a2a')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
 
     def test_a2a_send_by_payload_key(self):
         ev = self._event(payload={'tool': 'sessions_send', 'target': 'guard'})
-        self.assertEqual(self.h._classify_event(ev), 'a2a')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
 
     def test_a2a_receive_by_a2a_keyword(self):
         ev = self._event(summary='a2a_receive from peter')
-        self.assertEqual(self.h._classify_event(ev), 'a2a')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_receive')
 
     def test_agent_to_agent_keyword(self):
         ev = self._event(summary='agent-to-agent handoff')
-        self.assertEqual(self.h._classify_event(ev), 'a2a')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
 
     # ── subagent ─────────────────────────────────────────────────────────
 
     def test_subagent_spawn_by_summary(self):
         ev = self._event(summary='spawn subagent frontend-dev')
-        self.assertEqual(self.h._classify_event(ev), 'subagent')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_spawn')
 
     def test_subagent_spawn_by_payload_tool(self):
         ev = self._event(payload={'tool': 'sessions_spawn', 'label': 'qa-agent'})
-        self.assertEqual(self.h._classify_event(ev), 'subagent')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_spawn')
 
     def test_subagent_return_by_summary(self):
         ev = self._event(summary='subagent_return completed')
-        self.assertEqual(self.h._classify_event(ev), 'subagent')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_return')
 
     def test_session_colon_prefix(self):
         ev = self._event(summary='session: started new task')
-        self.assertEqual(self.h._classify_event(ev), 'subagent')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_spawn')
 
     # ── error ─────────────────────────────────────────────────────────────
 
@@ -696,17 +700,20 @@ class TestClassifyEvent(unittest.TestCase):
         """artifact_commit is not an a2a/subagent — should be 'timeline' or 'tool'."""
         ev = self._event(summary='artifact_commit requirements/REQUIREMENTS.md')
         result = self.h._classify_event(ev)
-        self.assertNotIn(result, ('a2a', 'subagent'))
+        self.assertFalse(self.h._is_a2a_kind(result), f"Expected non-a2a but got {result!r}")
+        self.assertFalse(self.h._is_subagent_kind(result), f"Expected non-subagent but got {result!r}")
 
     def test_stage_enter_in_summary_not_a2a(self):
         ev = self._event(summary='stage_enter developing')
         result = self.h._classify_event(ev)
-        self.assertNotIn(result, ('a2a', 'subagent'))
+        self.assertFalse(self.h._is_a2a_kind(result), f"Expected non-a2a but got {result!r}")
+        self.assertFalse(self.h._is_subagent_kind(result), f"Expected non-subagent but got {result!r}")
 
     def test_stage_exit_in_summary_not_a2a(self):
         ev = self._event(summary='stage_exit testing')
         result = self.h._classify_event(ev)
-        self.assertNotIn(result, ('a2a', 'subagent'))
+        self.assertFalse(self.h._is_a2a_kind(result), f"Expected non-a2a but got {result!r}")
+        self.assertFalse(self.h._is_subagent_kind(result), f"Expected non-subagent but got {result!r}")
 
     # ── fallthrough ───────────────────────────────────────────────────────
 
@@ -721,7 +728,7 @@ class TestClassifyEvent(unittest.TestCase):
     def test_a2a_priority_over_subagent(self):
         """sessions_send beats subagent keyword when both present."""
         ev = self._event(summary='sessions_send guard: spawned subagent helper')
-        self.assertEqual(self.h._classify_event(ev), 'a2a')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1026,8 +1033,14 @@ class TestAlertRuleSubagentAbnormalExit(unittest.TestCase):
         self.assertIsNone(row)
 
     def test_old_event_outside_24h_does_not_trigger(self):
-        """Subagent error event older than 24h → no alert."""
-        self._insert_event('parent-old', 'info', 'subagent error: old crash', hours_ago=25)
+        """Subagent error event older than 24h → no alert.
+
+        Use 49h to guarantee the timestamp is on a different calendar day than the
+        24h threshold. This avoids a SQLite string-comparison edge case where ISO
+        timestamps with 'T' separator compare incorrectly against SQLite's
+        'datetime()' output (space separator) on the same calendar day.
+        """
+        self._insert_event('parent-old', 'info', 'subagent error: old crash', hours_ago=49)
         run_alert_checks(self.conn)
         row = self.conn.execute(
             "SELECT * FROM alerts WHERE alert_type='subagent_abnormal_exit' AND agent_name='parent-old'"
@@ -1042,6 +1055,436 @@ class TestAlertRuleSubagentAbnormalExit(unittest.TestCase):
         ).fetchone()
         self.assertIsNotNone(row)
         self.assertIn('parent-msg', row[0])
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 10. BUG-1: Fine-grained milestone classification using event_category
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestBug1ClassifyEventFinegrained(unittest.TestCase):
+    """_classify_event must use event_category to return fine-grained milestone kinds."""
+
+    def setUp(self):
+        self.h = FakeHandler(':memory:')
+
+    def _ev(self, category, event_type='', summary='', severity='info'):
+        return {
+            'event_category': category,
+            'event_type': event_type,
+            'summary': summary,
+            'payload_json': '{}',
+            'severity': severity,
+        }
+
+    # ── milestone category ───────────────────────────────────────────────
+
+    def test_milestone_default_is_stage_enter(self):
+        ev = self._ev('milestone', 'stage_enter', 'entering develop')
+        self.assertEqual(self.h._classify_event(ev), 'stage_enter')
+
+    def test_milestone_stage_exit_event_type(self):
+        ev = self._ev('milestone', 'stage_exit', 'exiting develop')
+        self.assertEqual(self.h._classify_event(ev), 'stage_exit')
+
+    def test_milestone_stage_exit_from_summary_keyword(self):
+        ev = self._ev('milestone', '', 'stage_exit from developing')
+        self.assertEqual(self.h._classify_event(ev), 'stage_exit')
+
+    def test_milestone_artifact_commit_event_type(self):
+        ev = self._ev('milestone', 'artifact_commit', 'committing qa/report.md')
+        self.assertEqual(self.h._classify_event(ev), 'artifact_commit')
+
+    # ── a2a category ─────────────────────────────────────────────────────
+
+    def test_a2a_category_send_event_type(self):
+        ev = self._ev('a2a', 'a2a_send', 'sending task to guard')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
+
+    def test_a2a_category_receive_event_type(self):
+        ev = self._ev('a2a', 'a2a_receive', 'received from peter')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_receive')
+
+    def test_a2a_category_recv_abbreviation(self):
+        ev = self._ev('a2a', 'a2a_recv', 'received message')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_receive')
+
+    def test_a2a_category_default_is_a2a_send(self):
+        ev = self._ev('a2a', 'message', 'passing message')
+        self.assertEqual(self.h._classify_event(ev), 'a2a_send')
+
+    # ── subagent category ─────────────────────────────────────────────────
+
+    def test_subagent_category_spawn_event_type(self):
+        ev = self._ev('subagent', 'subagent_spawn', 'launching frontend-dev')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_spawn')
+
+    def test_subagent_category_return_event_type(self):
+        ev = self._ev('subagent', 'subagent_return', 'subagent finished')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_return')
+
+    def test_subagent_category_exit_event_type(self):
+        ev = self._ev('subagent', 'subagent_exit', 'subagent exited')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_return')
+
+    def test_subagent_category_default_is_spawn(self):
+        ev = self._ev('subagent', 'start', 'starting subagent')
+        self.assertEqual(self.h._classify_event(ev), 'subagent_spawn')
+
+    # ── warning severity ──────────────────────────────────────────────────
+
+    def test_warning_severity_no_category_returns_warning(self):
+        ev = self._ev('', '', 'high token usage', severity='warning')
+        self.assertEqual(self.h._classify_event(ev), 'warning')
+
+    def test_warning_severity_overrides_text_match(self):
+        """warning severity takes priority over text-based tool detection."""
+        ev = self._ev('', '', 'tool usage excessive', severity='warning')
+        self.assertEqual(self.h._classify_event(ev), 'warning')
+
+    # ── is_subagent_kind / is_a2a_kind helpers ───────────────────────────
+
+    def test_is_subagent_kind_spawn(self):
+        self.assertTrue(self.h._is_subagent_kind('subagent_spawn'))
+
+    def test_is_subagent_kind_return(self):
+        self.assertTrue(self.h._is_subagent_kind('subagent_return'))
+
+    def test_is_subagent_kind_legacy(self):
+        self.assertTrue(self.h._is_subagent_kind('subagent'))
+
+    def test_is_a2a_kind_send(self):
+        self.assertTrue(self.h._is_a2a_kind('a2a_send'))
+
+    def test_is_a2a_kind_receive(self):
+        self.assertTrue(self.h._is_a2a_kind('a2a_receive'))
+
+    def test_is_a2a_kind_legacy(self):
+        self.assertTrue(self.h._is_a2a_kind('a2a'))
+
+    def test_is_subagent_kind_rejects_a2a(self):
+        self.assertFalse(self.h._is_subagent_kind('a2a_send'))
+
+    def test_is_a2a_kind_rejects_subagent(self):
+        self.assertFalse(self.h._is_a2a_kind('subagent_spawn'))
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 11. BUG-2: _stage_priority supports new short-form stage names
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestBug2StagePriorityNewFormat(unittest.TestCase):
+    """_stage_priority must treat new short-form names the same as old long-form names."""
+
+    def setUp(self):
+        self.h = FakeHandler(':memory:')
+
+    def test_develop_equals_developing_priority(self):
+        self.assertEqual(self.h._stage_priority('develop'), self.h._stage_priority('developing'))
+
+    def test_test_equals_testing_priority(self):
+        self.assertEqual(self.h._stage_priority('test'), self.h._stage_priority('testing'))
+
+    def test_deploy_equals_deploying_priority(self):
+        self.assertEqual(self.h._stage_priority('deploy'), self.h._stage_priority('deploying'))
+
+    def test_develop_beats_done(self):
+        self.assertGreater(self.h._stage_priority('develop'), self.h._stage_priority('done'))
+
+    def test_test_beats_done(self):
+        self.assertGreater(self.h._stage_priority('test'), self.h._stage_priority('done'))
+
+    def test_deploy_beats_done(self):
+        self.assertGreater(self.h._stage_priority('deploy'), self.h._stage_priority('done'))
+
+    def test_develop_beats_test(self):
+        self.assertGreater(self.h._stage_priority('develop'), self.h._stage_priority('test'))
+
+    def test_archived_lower_than_done(self):
+        self.assertLess(self.h._stage_priority('archived'), self.h._stage_priority('done'))
+
+    def test_blocked_lower_than_done(self):
+        self.assertLess(self.h._stage_priority('blocked'), self.h._stage_priority('done'))
+
+    def test_unknown_stage_returns_minus_one(self):
+        self.assertEqual(self.h._stage_priority('foobar'), -1)
+
+    def test_none_returns_minus_one(self):
+        self.assertEqual(self.h._stage_priority(None), -1)
+
+    def test_new_format_project_sorts_before_completed(self):
+        """Project with stage='test' must appear before stage='done' in grouped sort."""
+        conn, db_path = make_db()
+        try:
+            conn.executemany("""
+                INSERT INTO agg_project_flow
+                (project_id, base_project, version, project_name, lifecycle,
+                 current_stage, stage_owner, stage_enter_time, block_reason,
+                 updated_at, status_file, artifact_root)
+                VALUES (?, ?, ?, ?, ?, ?, 'peter', '2026-04-18T00:00:00Z', '', ?, '', '')
+            """, [
+                ('proj-test', 'proj-test', 'v1', 'proj-test', 'active',     'test', '2026-04-20T10:00:00Z'),
+                ('proj-done', 'proj-done', 'v1', 'proj-done', 'completed',  'done', '2026-04-19T10:00:00Z'),
+            ])
+            conn.commit()
+            h = FakeHandler(db_path)
+            h._api_projects({'grouped': ['1']})
+            stages = [grp['versions'][0]['current_stage'] for grp in h.payload]
+            self.assertEqual(stages[0], 'test', f"Expected 'test' first, got {stages}")
+        finally:
+            conn.close()
+            Path(db_path).unlink(missing_ok=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 12. BUG-3: _normalize_stage + agent detail current_stage
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestBug3NormalizeStage(unittest.TestCase):
+    """_normalize_stage must map old long-form names to new short-form names."""
+
+    def setUp(self):
+        self.h = FakeHandler(':memory:')
+
+    def test_developing_to_develop(self):
+        self.assertEqual(self.h._normalize_stage('developing'), 'develop')
+
+    def test_testing_to_test(self):
+        self.assertEqual(self.h._normalize_stage('testing'), 'test')
+
+    def test_deploying_to_deploy(self):
+        self.assertEqual(self.h._normalize_stage('deploying'), 'deploy')
+
+    def test_new_format_develop_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('develop'), 'develop')
+
+    def test_new_format_test_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('test'), 'test')
+
+    def test_new_format_deploy_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('deploy'), 'deploy')
+
+    def test_done_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('done'), 'done')
+
+    def test_deployed_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('deployed'), 'deployed')
+
+    def test_archived_unchanged(self):
+        self.assertEqual(self.h._normalize_stage('archived'), 'archived')
+
+    def test_none_returns_none(self):
+        self.assertIsNone(self.h._normalize_stage(None))
+
+    def test_empty_string_returns_empty_string(self):
+        self.assertEqual(self.h._normalize_stage(''), '')
+
+
+class TestBug3AgentDetailCurrentStage(unittest.TestCase):
+    """_api_agent_detail must return current_stage in normalized new-format."""
+
+    def setUp(self):
+        self.conn, self.db_path = make_db()
+
+    def tearDown(self):
+        self.conn.close()
+        Path(self.db_path).unlink(missing_ok=True)
+
+    def _insert_agent(self, name, stage):
+        self.conn.execute("""
+            INSERT OR REPLACE INTO agg_agent_status
+            (agent_name, status, current_stage, last_action_time, updated_at)
+            VALUES (?, 'running', ?, ?, ?)
+        """, (name, stage, _dt_ago(minutes=5), _dt_ago(minutes=1)))
+        self.conn.commit()
+
+    def test_developing_normalized_in_agent_detail(self):
+        self._insert_agent('peter', 'developing')
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['peter'], 'range': ['1d']})
+        self.assertEqual(h.status, 200)
+        self.assertEqual(h.payload['agent']['current_stage'], 'develop')
+
+    def test_testing_normalized_in_agent_detail(self):
+        self._insert_agent('guard', 'testing')
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['guard'], 'range': ['1d']})
+        self.assertEqual(h.payload['agent']['current_stage'], 'test')
+
+    def test_new_format_develop_unchanged_in_detail(self):
+        self._insert_agent('doraemon', 'develop')
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['doraemon'], 'range': ['1d']})
+        self.assertEqual(h.payload['agent']['current_stage'], 'develop')
+
+    def test_current_stage_present_in_agent_detail(self):
+        self._insert_agent('atlas', 'developing')
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['atlas'], 'range': ['1d']})
+        self.assertIn('current_stage', h.payload['agent'])
+
+    def test_agent_detail_includes_timeline_key(self):
+        self._insert_agent('jarvis', 'deploy')
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['jarvis'], 'range': ['1d']})
+        self.assertIn('timeline', h.payload)
+        self.assertIn('subagents', h.payload)
+        self.assertIn('a2a', h.payload)
+
+    def test_agent_not_found_returns_404(self):
+        h = FakeHandler(self.db_path)
+        h._api_agent_detail({'agent': ['nobody'], 'range': ['1d']})
+        self.assertEqual(h.status, 404)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 13. FIX: subagent_abnormal_exit 24h window — Python-side parse_dt comparison
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestSubagentAbnormalExitTimezone(unittest.TestCase):
+    """Rule 8 must use Python parse_dt() for 24h window so mixed-timezone
+    event_time strings (UTC +00:00, CST +08:00) are all handled correctly."""
+
+    def setUp(self):
+        self.conn, self.db_path = make_db()
+
+    def tearDown(self):
+        self.conn.close()
+        Path(self.db_path).unlink(missing_ok=True)
+
+    def _insert_event(self, agent_name, summary, hours_ago, tz='utc'):
+        """Insert event with UTC (+00:00) or CST (+08:00) timestamp."""
+        import hashlib
+        raw = f"{agent_name}|{summary}|{hours_ago}|{tz}"
+        eid = hashlib.sha256(raw.encode()).hexdigest()[:16]
+        if tz == 'utc':
+            ts = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat(timespec='seconds')
+        else:
+            ts = (datetime.now(CST) - timedelta(hours=hours_ago)).isoformat(timespec='seconds')
+        self.conn.execute("""
+            INSERT OR IGNORE INTO event_log
+            (event_id, event_time, source_type, agent_name, event_category, event_type,
+             severity, summary)
+            VALUES (?, ?, 'session', ?, 'agent', 'llm_call', 'info', ?)
+        """, (eid, ts, agent_name, summary))
+        self.conn.commit()
+
+    def test_recent_utc_event_triggers(self):
+        """Event 2h ago stored with +00:00 UTC offset → alert fires."""
+        self._insert_event('tz-utc-recent', 'subagent error: crash', 2, tz='utc')
+        run_alert_checks(self.conn)
+        row = self.conn.execute(
+            "SELECT severity FROM alerts WHERE alert_type='subagent_abnormal_exit' AND agent_name='tz-utc-recent'"
+        ).fetchone()
+        self.assertIsNotNone(row, "Expected alert for recent UTC event but got None")
+        self.assertEqual(row[0], 'warning')
+
+    def test_recent_cst_event_triggers(self):
+        """Event 2h ago stored with +08:00 CST offset → alert fires."""
+        self._insert_event('tz-cst-recent', 'subagent error: crash', 2, tz='cst')
+        run_alert_checks(self.conn)
+        row = self.conn.execute(
+            "SELECT severity FROM alerts WHERE alert_type='subagent_abnormal_exit' AND agent_name='tz-cst-recent'"
+        ).fetchone()
+        self.assertIsNotNone(row, "Expected alert for recent CST event but got None")
+
+    def test_utc_event_25h_ago_does_not_trigger(self):
+        """Event 25h ago with UTC +00:00 timestamp → must NOT trigger.
+
+        This is the exact bug the fix addresses: the old SQLite
+        datetime('now', '-24 hours') comparison produced incorrect results
+        for ISO strings containing 'T' separator or timezone offsets.
+        Python-side parse_dt() comparison correctly excludes this event.
+        """
+        self._insert_event('tz-utc-old', 'subagent error: old crash', 25, tz='utc')
+        run_alert_checks(self.conn)
+        row = self.conn.execute(
+            "SELECT * FROM alerts WHERE alert_type='subagent_abnormal_exit' AND agent_name='tz-utc-old'"
+        ).fetchone()
+        self.assertIsNone(row, "Old UTC event (25h ago) must not fire alert")
+
+    def test_cst_event_25h_ago_does_not_trigger(self):
+        """Event 25h ago with CST +08:00 timestamp → must NOT trigger."""
+        self._insert_event('tz-cst-old', 'subagent error: old crash', 25, tz='cst')
+        run_alert_checks(self.conn)
+        row = self.conn.execute(
+            "SELECT * FROM alerts WHERE alert_type='subagent_abnormal_exit' AND agent_name='tz-cst-old'"
+        ).fetchone()
+        self.assertIsNone(row, "Old CST event (25h ago) must not fire alert")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 14. FIX: _stage_priority compat aliases — dev/qa/acceptance/requirements
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestStagePriorityCompatAliases(unittest.TestCase):
+    """_stage_priority must map all ARTIFACT_STAGES aliases and compat names."""
+
+    def setUp(self):
+        self.h = FakeHandler(':memory:')
+
+    def test_dev_equals_develop_priority(self):
+        """'dev' is an alias for 'develop' (V3/V4 status.json compat)."""
+        self.assertEqual(self.h._stage_priority('dev'), self.h._stage_priority('develop'))
+
+    def test_qa_equals_test_priority(self):
+        """'qa' is an alias for 'test'."""
+        self.assertEqual(self.h._stage_priority('qa'), self.h._stage_priority('test'))
+
+    def test_acceptance_equals_accepting_priority(self):
+        """'acceptance' must map to same priority as 'accepting'."""
+        self.assertEqual(self.h._stage_priority('acceptance'), self.h._stage_priority('accepting'))
+
+    def test_requirements_is_known_positive_stage(self):
+        """'requirements' is a planning stage — priority > done (0)."""
+        self.assertGreater(self.h._stage_priority('requirements'), self.h._stage_priority('done'))
+
+    def test_requirements_beats_done(self):
+        self.assertGreater(self.h._stage_priority('requirements'), 0)
+
+    def test_dev_beats_done(self):
+        self.assertGreater(self.h._stage_priority('dev'), self.h._stage_priority('done'))
+
+    def test_qa_beats_done(self):
+        self.assertGreater(self.h._stage_priority('qa'), self.h._stage_priority('done'))
+
+    def test_acceptance_beats_done(self):
+        self.assertGreater(self.h._stage_priority('acceptance'), self.h._stage_priority('done'))
+
+    def test_all_required_stages_are_known(self):
+        """All required stage names must return a value != -1 (not unknown)."""
+        required = [
+            'develop', 'developing', 'test', 'testing', 'deploy', 'deploying',
+            'acceptance', 'accepting', 'dev', 'qa', 'requirements',
+            'planned', 'done', 'archived', 'blocked',
+        ]
+        for stage in required:
+            priority = self.h._stage_priority(stage)
+            self.assertNotEqual(priority, -1, f"Stage '{stage}' returned -1 (unmapped)")
+
+    def test_grouped_sort_with_dev_and_qa_stages(self):
+        """Projects with dev/qa stages must sort before 'done' in grouped view."""
+        conn, db_path = make_db()
+        try:
+            conn.executemany("""
+                INSERT INTO agg_project_flow
+                (project_id, base_project, version, project_name, lifecycle,
+                 current_stage, stage_owner, stage_enter_time, block_reason,
+                 updated_at, status_file, artifact_root)
+                VALUES (?, ?, ?, ?, ?, ?, 'peter', '2026-04-18T00:00:00Z', '', ?, '', '')
+            """, [
+                ('proj-dev',  'proj-dev',  'v1', 'proj-dev',  'active',    'dev',  '2026-04-20T12:00:00Z'),
+                ('proj-qa',   'proj-qa',   'v1', 'proj-qa',   'active',    'qa',   '2026-04-20T11:00:00Z'),
+                ('proj-done', 'proj-done', 'v1', 'proj-done', 'completed', 'done', '2026-04-19T10:00:00Z'),
+            ])
+            conn.commit()
+            h = FakeHandler(db_path)
+            h._api_projects({'grouped': ['1']})
+            stages = [grp['versions'][0]['current_stage'] for grp in h.payload]
+            last_stage = stages[-1]
+            self.assertEqual(last_stage, 'done', f"'done' should sort last, got order: {stages}")
+        finally:
+            conn.close()
+            Path(db_path).unlink(missing_ok=True)
 
 
 if __name__ == '__main__':

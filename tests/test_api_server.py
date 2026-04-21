@@ -44,6 +44,7 @@ class FakeHandler:
     _parse_limit = MonitorHandler._parse_limit
     _group_projects = MonitorHandler._group_projects
     _stage_priority = MonitorHandler._stage_priority
+    _normalize_stage = MonitorHandler._normalize_stage
     _load_project_records = MonitorHandler._load_project_records
     _api_alerts = MonitorHandler._api_alerts
     _api_projects = MonitorHandler._api_projects
@@ -58,6 +59,8 @@ class FakeHandler:
     _parse_datetime = MonitorHandler._parse_datetime
     _parse_payload = MonitorHandler._parse_payload
     _classify_event = MonitorHandler._classify_event
+    _is_subagent_kind = MonitorHandler._is_subagent_kind
+    _is_a2a_kind = MonitorHandler._is_a2a_kind
     _event_title = MonitorHandler._event_title
     _event_detail = MonitorHandler._event_detail
     _extract_counterparty = MonitorHandler._extract_counterparty

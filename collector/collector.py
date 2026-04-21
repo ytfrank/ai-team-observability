@@ -542,19 +542,29 @@ def run_alert_checks(conn):
                          message=f"Agent {agent_name} recent token usage ({recent_tokens}) exceeds 3x daily average ({daily_avg:.0f})")
 
     # Rule 8: subagent_abnormal_exit — sub-agent started but exited abnormally
-    subagent_error_agents = conn.execute("""
-        SELECT DISTINCT agent_name FROM event_log
-        WHERE event_time >= datetime('now', '-24 hours')
-          AND (
+    # Use Python-side parse_dt() for time comparison (consistent with Rules 1-5),
+    # so mixed-timezone event_time strings (UTC +00:00 vs CST +08:00) are handled correctly.
+    cutoff_24h = now - timedelta(hours=24)
+    subagent_error_rows = conn.execute("""
+        SELECT agent_name, event_time FROM event_log
+        WHERE (
             (lower(summary) LIKE '%subagent%' AND (lower(summary) LIKE '%error%' OR lower(summary) LIKE '%fail%' OR lower(summary) LIKE '%abort%'))
             OR (lower(summary) LIKE '%spawn%' AND severity = 'error')
             OR (event_type = 'subagent_exit' AND severity = 'error')
           )
+        ORDER BY event_time DESC
+        LIMIT 500
     """).fetchall()
-    for (agent_name,) in subagent_error_agents:
-        aid = event_id('subagent_abnormal_exit', agent_name)
-        insert_alert(aid, 'subagent_abnormal_exit', 'warning', agent_name=agent_name,
-                     message=f"Agent {agent_name} has a sub-agent that started but exited abnormally")
+    seen_subagent_agents = set()
+    for agent_name, event_time in subagent_error_rows:
+        if agent_name in seen_subagent_agents:
+            continue
+        dt = parse_dt(event_time)
+        if dt and dt >= cutoff_24h:
+            seen_subagent_agents.add(agent_name)
+            aid = event_id('subagent_abnormal_exit', agent_name)
+            insert_alert(aid, 'subagent_abnormal_exit', 'warning', agent_name=agent_name,
+                         message=f"Agent {agent_name} has a sub-agent that started but exited abnormally")
 
     # Record alert run timestamp
     conn.execute("INSERT OR REPLACE INTO collector_state (key, value) VALUES ('last_alert_run', ?)",
