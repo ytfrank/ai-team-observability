@@ -501,6 +501,8 @@ class MonitorHandler(BaseHTTPRequestHandler):
         now = datetime.now(timezone.utc)
         if range_key == 'today':
             return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if range_key == '3d':
+            return now - timedelta(days=3)
         if range_key == 'custom':
             return now - timedelta(days=30)
         return now - timedelta(days=7)

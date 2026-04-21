@@ -489,6 +489,73 @@ def run_alert_checks(conn):
             insert_alert(aid, 'consecutive_stalled', 'critical', project_id=project_id,
                          message=f"Project {project_id} stalled with same block reason for over 1 hour: {block_reason[:100]}")
 
+    # Rule 6: llm_consecutive_errors — agent with 3+ consecutive LLM call failures
+    agent_names = conn.execute(
+        "SELECT DISTINCT agent_name FROM event_log"
+    ).fetchall()
+    for (agent_name,) in agent_names:
+        recent_events = conn.execute("""
+            SELECT severity, summary FROM event_log
+            WHERE agent_name=?
+            ORDER BY event_time DESC
+            LIMIT 10
+        """, (agent_name,)).fetchall()
+        consec = 0
+        for sev, summary in recent_events:
+            s = (summary or '').lower()
+            if sev == 'error' or 'error' in s:
+                consec += 1
+            else:
+                break
+        if consec >= 3:
+            aid = event_id('llm_consecutive_errors', agent_name)
+            insert_alert(aid, 'llm_consecutive_errors', 'warning', agent_name=agent_name,
+                         message=f"Agent {agent_name} has {consec} consecutive LLM call failures")
+
+    # Rule 7: token_spike — agent token usage exceeds 3x daily average
+    # Historical average excludes the last hour to avoid counting the spike itself
+    token_rows = conn.execute("""
+        SELECT agent_name,
+               SUM(input_tokens + output_tokens) AS week_total,
+               COUNT(DISTINCT substr(event_time, 1, 10)) AS active_days
+        FROM event_log
+        WHERE (input_tokens + output_tokens) > 0
+          AND event_time >= datetime('now', '-7 days')
+          AND event_time < datetime('now', '-1 hour')
+        GROUP BY agent_name
+        HAVING active_days >= 2
+    """).fetchall()
+    for row in token_rows:
+        agent_name, week_total, active_days = row[0], row[1], row[2]
+        daily_avg = week_total / active_days
+        if daily_avg <= 0:
+            continue
+        recent_tokens = conn.execute("""
+            SELECT COALESCE(SUM(input_tokens + output_tokens), 0)
+            FROM event_log
+            WHERE agent_name=? AND event_time >= datetime('now', '-1 hour')
+              AND (input_tokens + output_tokens) > 0
+        """, (agent_name,)).fetchone()[0]
+        if recent_tokens > daily_avg * 3:
+            aid = event_id('token_spike', agent_name)
+            insert_alert(aid, 'token_spike', 'warning', agent_name=agent_name,
+                         message=f"Agent {agent_name} recent token usage ({recent_tokens}) exceeds 3x daily average ({daily_avg:.0f})")
+
+    # Rule 8: subagent_abnormal_exit — sub-agent started but exited abnormally
+    subagent_error_agents = conn.execute("""
+        SELECT DISTINCT agent_name FROM event_log
+        WHERE event_time >= datetime('now', '-24 hours')
+          AND (
+            (lower(summary) LIKE '%subagent%' AND (lower(summary) LIKE '%error%' OR lower(summary) LIKE '%fail%' OR lower(summary) LIKE '%abort%'))
+            OR (lower(summary) LIKE '%spawn%' AND severity = 'error')
+            OR (event_type = 'subagent_exit' AND severity = 'error')
+          )
+    """).fetchall()
+    for (agent_name,) in subagent_error_agents:
+        aid = event_id('subagent_abnormal_exit', agent_name)
+        insert_alert(aid, 'subagent_abnormal_exit', 'warning', agent_name=agent_name,
+                     message=f"Agent {agent_name} has a sub-agent that started but exited abnormally")
+
     # Record alert run timestamp
     conn.execute("INSERT OR REPLACE INTO collector_state (key, value) VALUES ('last_alert_run', ?)",
                  (now_iso,))

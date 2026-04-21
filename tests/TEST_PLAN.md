@@ -1,80 +1,63 @@
-# TEST_PLAN.md — ai-team-observability V1.0
+# TEST_PLAN.md — ai-team-observability V4
 
-**测试负责人**: Guard  
-**日期**: 2026-04-10 04:10  
-**风险等级**: medium  
-**对应commit**: fd33aa7 / 67df601  
-**测试矩阵**: normal（api + ui_flow + logs_config + regression）
-
----
-
-## 一、测试范围
-
-### 改动点
-1. **Event Collector** (`collector/collector.py`) — 6数据源采集，写入SQLite
-2. **API Server** (`api/api_server.py`) — REST API + 静态页面服务
-3. **Dashboard UI** (`web/static/index.html`) — 深色主题，30s自动刷新
-4. **告警规则** (`collector/alert_rules.py`) — 注：文件不存在，集成在collector.py中
-
-### 不测
-- Go版API（未完成）
-- 前端详情页（占位）
-- 部署到 monitor.doramax.cn（Atlas负责）
+- 测试时间：2026-04-20 21:05+
+- 提测 commit：9de996ec7f0179d337172e3554860be7797ecc19
+- 风险等级：**中**（3个P0功能新增 + 安全回归）
+- 测试矩阵：**normal**
 
 ---
 
-## 二、测试场景
+## 测试范围
 
-### 2.1 API测试（核心）
-| # | 场景 | 操作 | 校验点 |
-|---|------|------|--------|
-| 1 | Collector运行 | `python3 collector.py --once` | 无报错，SQLite生成，表创建正确 |
-| 2 | /api/stats | GET请求 | 返回JSON，含active_agents/projects/events_24h/tokens_24h |
-| 3 | /api/agents | GET请求 | 返回agent数组，每个含name/status/last_action |
-| 4 | /api/projects | GET请求 | 返回项目数组，每个含id/stage/owner |
-| 5 | /api/events | GET请求 | 返回事件列表 |
-| 6 | /api/alerts | GET请求 | 返回告警列表 |
-| 7 | API错误路径 | 访问不存在的路由 | 返回404 |
+### P0-1: Agent详情页（/team/agents）
+- Agent列表加载（/api/agents 返回数据）
+- 点击Agent → 详情展示：timeline / sub-agents / A2A / heatmap
+- 时间范围筛选（today / 7d / custom）
+- 热力图数据正确（7×24=168个bucket）
 
-### 2.2 UI/Dashboard测试
-| # | 场景 | 操作 | 校验点 |
-|---|------|------|--------|
-| 8 | Dashboard主页 | GET / | HTTP 200, HTML渲染 |
-| 9 | 静态页面 | GET /team/agents, /team/projects, /team/alerts | HTTP 200 |
-| 10 | 自动刷新 | 检查index.html源码 | 含30s定时刷新逻辑 |
+### P0-2: Dashboard跳转（index.html）
+- agents卡片 → /team/agents
+- projects卡片 → /team/projects
+- events卡片 → /team/agents#recent-events
+- blocked卡片 → /team/projects?filter=blocked
+- 趋势指标展示（up/down/flat）
 
-### 2.3 数据有效性测试
-| # | 场景 | 操作 | 校验点 |
-|---|------|------|--------|
-| 11 | 数据真实性 | Collector采集后检查SQLite | agent状态与实际OpenClaw状态一致 |
-| 12 | 空数据处理 | 清空数据后启动API | 不崩溃，返回空数组 |
+### P0-3: 成果物独立页面（/team/artifacts）
+- 独立页面加载
+- 按阶段分组（requirements → dev → qa → acceptance → deploy → handoffs）
+- 组内时间倒序
+- 搜索筛选
+- 预览（inline）
+- 下载
 
-### 2.4 回归/健壮性
-| # | 场景 | 操作 | 校验点 |
-|---|------|------|--------|
-| 13 | Collector重复运行 | --once连续跑两次 | 不报错，数据更新 |
-| 14 | API无Collector | 不跑Collector直接启动API | 不崩溃 |
+### 回归：Path Traversal
+- `/api/artifact?path=/etc/passwd` → 403
+- 合法路径 → 200
+
+## 测试策略
+
+本轮为 **API + 静态页面 + 安全回归** 测试。
+
+线上服务当前530（可能tunnel未连或本地服务未启），优先：
+1. **API单元测试**（已有11个，确认通过）
+2. **本地服务启动 + API集成测试**（curl验证所有端点）
+3. **浏览器E2E**（如服务可启，截图验证页面渲染）
+4. **Path traversal回归**
+
+### 测试分工
+
+| 测试项 | 执行者 | 状态 |
+|--------|--------|------|
+| API单元测试 | Guard主线程 | ✅ 11/11通过 |
+| API集成测试（curl） | Guard主线程 | 🟡 进行中 |
+| Path Traversal回归 | Guard主线程 | 🟡 待执行 |
+| 浏览器E2E页面渲染 | 降级/视服务状态 | 🟡 待评估 |
+
+### ETA
+- T+10: 测试方案（本文件）
+- T+25: API集成测试完成
+- T+30: 第一轮结果
 
 ---
 
-## 三、测试分工
-
-全部由Guard亲自执行（项目规模小，Python纯标准库，编排成本>执行成本）。
-
-## 四、测试方法
-
-- Collector: 直接运行 `python3 collector.py --once`
-- API: 启动 `python3 api_server.py`，用 `curl` 测试各端点
-- UI: `curl` 检查HTTP状态码 + 关键HTML元素
-- 数据: `sqlite3` 查询验证
-
-## 五、未覆盖项
-
-- 真实浏览器渲染（无headless browser环境）
-- 告警通知通道（飞书集成未实现）
-- 并发压测
-- monitor.doramax.cn线上部署验证
-
-## 六、ETA
-
-**预计25分钟内完成**（含执行+报告输出）
+*Guard | 2026-04-20 21:10*

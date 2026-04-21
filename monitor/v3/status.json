@@ -1,10 +1,10 @@
 {
   "project": "ai-team-observability",
   "version": 7,
-  "lifecycle": "active",
+  "lifecycle": "completed",
   "created_at": "2026-04-15T10:15:00+08:00",
   "workflow": {
-    "current_stage": "developing",
+    "current_stage": "done",
     "stage_history": [
       {
         "stage": "draft",
@@ -17,14 +17,38 @@
         "entered_at": "2026-04-15T10:15:00+08:00",
         "exited_at": "2026-04-15T08:23:00+08:00",
         "note": "波哥确认V3需求"
+      },
+      {
+        "stage": "developing",
+        "entered_at": "2026-04-17T08:05:00+08:00",
+        "exited_at": "2026-04-20T10:06:00+08:00",
+        "note": "PMO rescue：小叮当接手完成P0-1/P0-2/P0-3，commit dc11786"
+      },
+      {
+        "stage": "testing",
+        "entered_at": "2026-04-20T10:06:00+08:00",
+        "exited_at": "2026-04-20T10:18:00+08:00",
+        "note": "Guard测试Conditional Pass，15/15项验证通过"
+      },
+      {
+        "stage": "accepting",
+        "entered_at": "2026-04-20T10:18:00+08:00",
+        "exited_at": "2026-04-20T10:40:00+08:00",
+        "note": "小叮当验收Pass，P0全部完成"
+      },
+      {
+        "stage": "deploying",
+        "entered_at": "2026-04-20T10:40:00+08:00",
+        "exited_at": "2026-04-20T10:42:00+08:00",
+        "note": "Atlas部署完成，DEPLOY_REPORT.md门禁通过"
       }
     ],
-    "stage_owner": "doraemon",
-    "stage_status": "active",
-    "stage_entered_at": "2026-04-17T08:05:00+08:00",
-    "exception_state": "rescue_triggered",
-    "exception_since": "2026-04-20T08:05:00+08:00",
-    "exception_note": "PMO rescue: Peter连续55h+无新commit，波哥指示小叮当接手开发。",
+    "stage_owner": "atlas",
+    "stage_status": "completed",
+    "stage_entered_at": "2026-04-20T10:40:00+08:00",
+    "exception_state": null,
+    "exception_since": null,
+    "exception_note": null,
     "history": [
       {
         "time": "2026-04-17T08:05:00+08:00",
@@ -45,26 +69,30 @@
         "time": "2026-04-20T08:05:00+08:00",
         "event": "PMO rescue triggered: 小叮当接手V3开发，Peter交接。决策：继续开发不重做，基于现有代码完成P0-3+P1。",
         "stage": "developing"
+      },
+      {
+        "time": "2026-04-20T10:42:00+08:00",
+        "event": "PMO自动推进: deploying阶段DEPLOY_REPORT.md达标，推进至deployed",
+        "stage": "deploying->deployed"
       }
     ]
   },
   "official": {
-    "updated_at": "2026-04-18T00:42:00+08:00",
+    "updated_at": "2026-04-20T16:01:00+08:00",
     "updated_by": "doraemon",
-    "summary": "Peter恢复产出，commit 8eead33 (2026-04-18 00:03) 包含P0数据隔离+collector修复+项目页版本分组，1000行变更。已A2A催促提交详细进展报告和SUBMISSION.md。",
+    "summary": "V3-A完成部署，P0-1/P0-2/P0-3全部通过验收，已上线monitor.doramax.cn。V3-B包含P1 Agent事件图表化/Token趋势图。",
     "blocking": null,
     "risks": [
-      "图表渲染性能（Chart.js/ECharts）",
-      "成果物预览需处理多种文件类型"
+      "已知风险：图表渲染性能（Chart.js/ECharts）",
+      "已知风险：成果物预览多文件类型处理"
     ],
     "decisions": [
-      "基于V2代码迭代，不重写",
-      "纯Python+SQLite+Vanilla JS + Chart.js/ECharts CDN",
-      "Collector必须正确识别项目版本，数据不混淆",
-      "项目结构修正：V1使用monitor/v1/，V2使用monitor/v2/，V3使用monitor/v3/"
+      "PMO自动推进deployed（DEPLOY_REPORT.md达标）",
+      "等待波哥线上确认V3-A完成",
+      "V3-B优先级待确认"
     ],
-    "next_action": "等待Peter回复详细进展 → P0完成后提测",
-    "decision": "restored_by_bibo_order"
+    "next_action": "等待波哥线上确认V3-A完成",
+    "decision": "deployed_pending_confirmation"
   },
   "runtime": {
     "last_runtime_update_at": "2026-04-18T00:46:00+08:00",
@@ -108,28 +136,33 @@
     },
     "tech_plan": {
       "path": "monitor/v3/dev/TECH_PLAN.md",
-      "status": "pending",
-      "owner": "peter"
+      "status": "confirmed",
+      "owner": "peter",
+      "updated_at": "2026-04-15T08:23:00+08:00"
     },
     "submission": {
       "path": "monitor/v3/dev/SUBMISSION.md",
-      "status": "pending",
-      "owner": "peter"
+      "status": "approved",
+      "owner": "peter",
+      "updated_at": "2026-04-20T10:18:00+08:00"
     },
     "qa_report": {
       "path": "monitor/v3/qa/report.md",
-      "status": "pending",
-      "owner": "guard"
+      "status": "approved",
+      "owner": "guard",
+      "updated_at": "2026-04-20T10:18:00+08:00"
     },
     "acceptance": {
       "path": "monitor/v3/acceptance/ACCEPTANCE.md",
-      "status": "pending",
-      "owner": "doraemon"
+      "status": "approved",
+      "owner": "doraemon",
+      "updated_at": "2026-04-20T10:40:00+08:00"
     },
     "deploy_report": {
       "path": "monitor/v3/deploy/DEPLOY_REPORT.md",
-      "status": "pending",
-      "owner": "atlas"
+      "status": "approved",
+      "owner": "atlas",
+      "updated_at": "2026-04-20T10:42:00+08:00"
     }
   },
   "v2_baseline": {
